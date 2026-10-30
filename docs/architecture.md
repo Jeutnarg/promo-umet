@@ -14,22 +14,11 @@ The administrator promotion dashboard queries the immutable purchase ledger. Usa
 
 On the first startup after upgrading, a versioned migration scans legacy owner-scoped order documents, indexes their snapshots in the ledger, and removes their purchased carts. It records a completion marker after all orders are processed, retries concurrent conditional-write conflicts, and resumes safely after interruption. Later startups check the marker and skip the scan. This upgrade must run after stopping older backend versions so no old writer can create an unindexed purchase during migration. Normal dashboard reads use a partition query rather than a table scan.
 
-## Rule semantics
-
-- All money is USD cents. Percentage arithmetic uses decimal HALF_UP rounding. Aggregate savings use proportional largest-remainder allocation, with stable unit-ID ties. Percentages round once per selected scope, except `item`, which rounds per unit.
-- `oneitem` means once per selected line total. `item` means separately for each unit in that selected line. `items` aggregates eligible merchandise. `order` aggregates eligible merchandise and shipping.
-- Item-ID and category filters intersect when both are supplied. Narrow scopes target one eligible line; omitted targets select the first line by ID. Broad scopes cannot be narrowed by a selection's line ID.
-- Non-goal rules sort by declared scope, eligible distinct-item count, discount style, and ID. Styles are flat/BOGO, percentage, fixed price. Fixed prices never increase a balance.
-- BOGO pairs as many units as possible. Each pair grants the cheaper remaining unit free; equal-price ties use unit ID. Manual selections default to descending-price pairing. Optimizer results carry explicit pairs so their result can be reproduced exactly.
-- Goal rules run after all non-goal rules. All goal eligibility uses one frozen, post-non-goal merchandise subtotal, excluding shipping. Thresholds are strict `>`. Goal discounts still reduce remaining balances, so shipping cannot be discounted twice below zero.
-- Rainbow percentages count distinct eligible input categories, even if earlier discounts have reduced some eligible balances to zero.
-- Unit-exclusive promotions reserve all their targets, including both BOGO qualifying and free units. Order-exclusive promotions cannot coexist with another applied promotion. Zero-saving rules do not count as applied or reserve targets.
-- Expiration is inclusive: a promotion is unavailable at its expiration instant. Missing, disabled, expired, ineligible, conflicting, and zero-saving selections receive explanations.
-- The display sorts each line's savings descending. The calculation trace retains execution order.
+Rule semantics are documented in the [README](../README.md#rule-semantics).
 
 ## Search
 
-The optimizer enumerates subsets, narrow-scope line targets, and maximum-cardinality BOGO matchings in deterministic order. It prunes invalid partial selections. The empty selection is always a feasible initial incumbent. Every candidate passes through the same evaluator as manual checkout.
+The optimizer enumerates subsets, narrow-scope line targets, and maximum-cardinality BOGO matchings and exhaustive BOGO triple groupings in deterministic order. It prunes invalid partial selections. The empty selection is always a feasible initial incumbent. Every candidate passes through the same evaluator as manual checkout.
 
 Suggest minimizes total. Swindle lexicographically maximizes units with positive allocated savings, then minimizes total savings. Zero-priced units cannot contribute positive coverage; shipping never counts as a merchandise unit. Exact ties use stable serialized selection identifiers. Search completion proves optimality; a two-second deadline returns the best feasible incumbent and explicitly marks unproven objectives. Complete unit coverage independently proves maximum coverage. The budget bounds search work, not network/persistence latency.
 

@@ -2,6 +2,11 @@ package dev.promo;
 
 import dev.promo.domain.Optimizer;
 import dev.promo.domain.PricingEngine;
+import dev.promo.domain.PricingObserver;
+import dev.promo.observability.ActorContextFilter;
+import dev.promo.observability.DatabaseTelemetry;
+import dev.promo.observability.PricingTelemetry;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.net.URI;
 import java.time.Clock;
 import java.util.HashSet;
@@ -21,6 +26,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -40,23 +46,32 @@ public class Configuration {
 	}
 
 	@Bean
-	PricingEngine createPricingEngine() {
-		return new PricingEngine();
+	PricingEngine createPricingEngine(PricingObserver observer) {
+		return new PricingEngine(observer);
 	}
 
 	@Bean
-	Optimizer createPromotionOptimizer(PricingEngine engine) {
-		return new Optimizer(engine);
+	Optimizer createPromotionOptimizer(PricingEngine engine, PricingObserver observer) {
+		return new Optimizer(engine, observer);
+	}
+
+	@Bean
+	PricingObserver createPricingObserver(MeterRegistry metrics) {
+		return new PricingTelemetry(metrics);
 	}
 
 	@Bean
 	DynamoDbClient createDynamoClient(
 			@Value("${sandbox.endpoint:}") String endpoint,
-			@Value("${sandbox.region:us-east-1}") String region) {
+			@Value("${sandbox.region:us-east-1}") String region,
+			MeterRegistry metrics) {
 		var builder =
 				DynamoDbClient.builder()
 						.region(Region.of(region))
-						.httpClientBuilder(UrlConnectionHttpClient.builder());
+						.httpClientBuilder(UrlConnectionHttpClient.builder())
+						.overrideConfiguration(
+								configuration ->
+										configuration.addExecutionInterceptor(new DatabaseTelemetry(metrics)));
 		if (!endpoint.isBlank()) {
 			builder
 					.endpointOverride(URI.create(endpoint))
@@ -98,6 +113,7 @@ public class Configuration {
 		cors.setAllowedOrigins(origins);
 		cors.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
 		cors.setAllowedHeaders(List.of("Authorization", "Content-Type", "Idempotency-Key"));
+		cors.setExposedHeaders(List.of("X-Request-ID"));
 		var source = new UrlBasedCorsConfigurationSource();
 		source.registerCorsConfiguration("/**", cors);
 		var converter = new JwtAuthenticationConverter();
@@ -126,9 +142,12 @@ public class Configuration {
 										.permitAll()
 										.requestMatchers("/api/v1/admin/**")
 										.hasRole("admin")
+										.requestMatchers("/actuator/metrics", "/actuator/metrics/**")
+										.hasRole("admin")
 										.anyRequest()
 										.authenticated())
 				.oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(converter)))
+				.addFilterAfter(new ActorContextFilter(), BearerTokenAuthenticationFilter.class)
 				.build();
 	}
 }

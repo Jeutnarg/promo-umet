@@ -32,6 +32,16 @@ import java.util.Set;
 
 /** Calculates sequential promotion savings and reproducible unit allocations. */
 public final class PricingEngine {
+	private final PricingObserver observer;
+
+	public PricingEngine() {
+		this(PricingObserver.NONE);
+	}
+
+	public PricingEngine(PricingObserver observer) {
+		this.observer = Objects.requireNonNull(observer);
+	}
+
 	private static final class Unit {
 		final String id;
 		final String line;
@@ -71,6 +81,22 @@ public final class PricingEngine {
 	}
 
 	public Evaluation evaluateCartPrice(Cart cart, List<Promotion> promotions, Instant now) {
+		long started = System.nanoTime();
+		try {
+			var result = calculateCartPrice(cart, promotions, now);
+			observer.evaluationCompleted(cart, promotions.size(), result, System.nanoTime() - started);
+			return result;
+		} catch (RuntimeException failure) {
+			observer.calculationFailed("pricing", failure, System.nanoTime() - started);
+			throw failure;
+		}
+	}
+
+	Evaluation evaluateCandidatePrice(Cart cart, List<Promotion> promotions, Instant now) {
+		return calculateCartPrice(cart, promotions, now);
+	}
+
+	private Evaluation calculateCartPrice(Cart cart, List<Promotion> promotions, Instant now) {
 		validateEvaluationInputs(cart, promotions);
 		var units = createUnitBalances(cart);
 		var state = new EvaluationState(units, calculateMerchandiseSubtotal(units), cart.selections());

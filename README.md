@@ -94,6 +94,8 @@ npm audit --audit-level=moderate
 
 See [architecture and rule semantics](docs/architecture.md), [test evidence](docs/verification.md), and [AWS deployment](infra/aws/README.md).
 
+The backend provides correlated JSON request, database, pricing and exception logs plus administrator-only performance metrics. Every response includes `X-Request-ID`. See [service observability](docs/observability.md) for event fields, timing definitions, privacy behavior and ready-to-use investigation queries.
+
 ## Purchase records and promotion dashboard
 
 Each purchase permanently retains its items, quantities, promotion versions, discount allocations, shipping, total, and purchase time. Checkout atomically records it and deletes the source cart. A cart can be purchased only once, including concurrent submissions with different keys. Retrying the same completed submission returns its existing purchase. “Clone this cart” on the completion page creates a fresh cart from the purchase snapshot.

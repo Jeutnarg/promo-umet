@@ -33,6 +33,8 @@ import org.springframework.stereotype.Service;
 /** Coordinates owner-scoped persistence, pricing, quotes, and order submission. */
 @Service
 public class SandboxService {
+	private static final org.slf4j.Logger LOG =
+			org.slf4j.LoggerFactory.getLogger(SandboxService.class);
 	private final Store store;
 	private final ObjectMapper mapper;
 	private final PricingEngine engine;
@@ -260,6 +262,12 @@ public class SandboxService {
 			}
 			throw conflict;
 		}
+		LOG.atInfo()
+				.addKeyValue(
+						"cart_ref", dev.promo.observability.RequestDiagnostics.createReference(cart.id()))
+				.addKeyValue("units", cart.lines().stream().mapToInt(line -> line.quantity()).sum())
+				.addKeyValue("applied_promotions", evaluation.steps().size())
+				.log("purchase_recorded");
 		return order;
 	}
 
@@ -334,6 +342,11 @@ public class SandboxService {
 		if (!order.quoteId().equals(quoteId)) {
 			throw new Conflict("Idempotency key was used for another quote");
 		}
+		LOG.atInfo()
+				.addKeyValue(
+						"cart_ref",
+						dev.promo.observability.RequestDiagnostics.createReference(order.cart().id()))
+				.log("purchase_retry_reused");
 		return order;
 	}
 

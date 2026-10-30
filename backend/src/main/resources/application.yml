@@ -3,6 +3,8 @@ server:
   error:
     include-message: never
 spring:
+  main:
+    banner-mode: "off"
   application:
     name: promotion-sandbox
   profiles:
@@ -15,7 +17,11 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics
+logging:
+  structured:
+    format:
+      console: ecs
 sandbox:
   table: ${TABLE_NAME:promotion-sandbox}
   region: ${AWS_REGION:us-east-1}

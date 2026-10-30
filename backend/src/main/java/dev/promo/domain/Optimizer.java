@@ -20,12 +20,32 @@ import java.util.function.Consumer;
 /** Searches promotion selections and pairings within a bounded time budget. */
 public final class Optimizer {
 	private final PricingEngine engine;
+	private final PricingObserver observer;
 
 	public Optimizer(PricingEngine engine) {
+		this(engine, PricingObserver.NONE);
+	}
+
+	public Optimizer(PricingEngine engine, PricingObserver observer) {
 		this.engine = engine;
+		this.observer = observer;
 	}
 
 	public OptimizationResult findOptimalPromotions(
+			Cart cart, List<Promotion> promotions, Instant now, String mode, Duration budget) {
+		long started = System.nanoTime();
+		try {
+			var result = searchOptimalPromotions(cart, promotions, now, mode, budget);
+			observer.optimizationCompleted(
+					cart, promotions.size(), result, budget, System.nanoTime() - started);
+			return result;
+		} catch (RuntimeException failure) {
+			observer.calculationFailed("optimization", failure, System.nanoTime() - started);
+			throw failure;
+		}
+	}
+
+	private OptimizationResult searchOptimalPromotions(
 			Cart cart, List<Promotion> promotions, Instant now, String mode, Duration budget) {
 		Rules.validateCondition(
 				List.of("suggest", "swindle").contains(mode), "Mode must be suggest or swindle");
@@ -71,7 +91,7 @@ public final class Optimizer {
 
 		Evaluation evaluateSelections(List<Selection> selections) {
 			candidates++;
-			return engine.evaluateCartPrice(
+			return engine.evaluateCandidatePrice(
 					new Cart(
 							cart.id(),
 							cart.version(),

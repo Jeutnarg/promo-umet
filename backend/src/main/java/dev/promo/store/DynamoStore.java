@@ -18,6 +18,7 @@ import software.amazon.awssdk.services.dynamodb.model.KeyType;
 import software.amazon.awssdk.services.dynamodb.model.Put;
 import software.amazon.awssdk.services.dynamodb.model.ResourceInUseException;
 import software.amazon.awssdk.services.dynamodb.model.ResourceNotFoundException;
+import software.amazon.awssdk.services.dynamodb.model.ReturnConsumedCapacity;
 import software.amazon.awssdk.services.dynamodb.model.ScalarAttributeType;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
 import software.amazon.awssdk.services.dynamodb.model.TransactionCanceledException;
@@ -78,7 +79,11 @@ public class DynamoStore implements Store {
 		var item =
 				client
 						.getItem(
-								r -> r.tableName(table).key(buildDocumentKey(partition, id)).consistentRead(true))
+								r ->
+										r.tableName(table)
+												.key(buildDocumentKey(partition, id))
+												.consistentRead(true)
+												.returnConsumedCapacity(ReturnConsumedCapacity.TOTAL))
 						.item();
 		return item.isEmpty() ? Optional.empty() : Optional.of(deserializeStoredDocument(item));
 	}
@@ -159,7 +164,8 @@ public class DynamoStore implements Store {
 			actions.add(TransactWriteItem.builder().conditionCheck(builder.build()).build());
 		}
 		try {
-			client.transactWriteItems(r -> r.transactItems(actions));
+			client.transactWriteItems(
+					r -> r.transactItems(actions).returnConsumedCapacity(ReturnConsumedCapacity.TOTAL));
 		} catch (TransactionCanceledException exception) {
 			if (exception.cancellationReasons().stream()
 					.anyMatch(reason -> "ConditionalCheckFailed".equals(reason.code()))) {

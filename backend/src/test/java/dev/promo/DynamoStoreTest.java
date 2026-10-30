@@ -19,6 +19,67 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 @EnabledIfEnvironmentVariable(named = "DYNAMO_TEST_ENDPOINT", matches = ".+")
 class DynamoStoreTest {
 	@Test
+	void sdkTelemetryTimesEachDatabasePage() {
+		try (var registry = new TestMeterRegistry();
+				var client =
+						DynamoDbClient.builder()
+								.region(Region.US_EAST_1)
+								.endpointOverride(URI.create(System.getenv("DYNAMO_TEST_ENDPOINT")))
+								.credentialsProvider(
+										StaticCredentialsProvider.create(AwsBasicCredentials.create("local", "local")))
+								.overrideConfiguration(
+										configuration ->
+												configuration
+														.addExecutionInterceptor(
+																new software.amazon.awssdk.core.interceptor.ExecutionInterceptor() {
+																	@Override
+																	public software.amazon.awssdk.core.SdkRequest modifyRequest(
+																			software.amazon.awssdk.core.interceptor.Context.ModifyRequest
+																					context,
+																			software.amazon.awssdk.core.interceptor.ExecutionAttributes
+																					attributes) {
+																		return context.request()
+																						instanceof
+																						software.amazon.awssdk.services.dynamodb.model
+																										.QueryRequest
+																								query
+																				? query.toBuilder().limit(2).build()
+																				: context.request();
+																	}
+																})
+														.addExecutionInterceptor(
+																new dev.promo.observability.DatabaseTelemetry(registry)))
+								.build()) {
+			String table = "telemetry-test-" + UUID.randomUUID();
+			var store = new DynamoStore(client, table, true);
+			try {
+				var diagnostics =
+						dev.promo.observability.RequestDiagnostics.beginRequest("pagination-test");
+				String payload = "{\"padding\":\"" + "x".repeat(100) + "\"}";
+				store.executeTransaction(
+						java.util.stream.IntStream.range(0, 4)
+								.mapToObj(
+										index -> new Store.Write("user#owner#carts", "page-item-" + index, 0, payload))
+								.toList(),
+						List.of());
+				assertThat(store.listDocuments("user#owner#carts")).hasSize(4);
+				long pages =
+						registry
+								.get("sandbox.database.duration")
+								.tags("operation", "Query", "resource", "carts", "outcome", "success")
+								.timer()
+								.count();
+				assertThat(pages).isGreaterThanOrEqualTo(2);
+				assertThat(diagnostics.getDatabaseCalls()).isEqualTo(pages + 1);
+			} finally {
+				dev.promo.observability.RequestDiagnostics.finishRequest();
+				org.slf4j.MDC.clear();
+				client.deleteTable(request -> request.tableName(table));
+			}
+		}
+	}
+
+	@Test
 	void purchasesPersistAtomicallyAndCannotBeRepeatedAfterServiceRestart() {
 		try (var client = createLocalDynamoClient()) {
 			String table = "purchase-test-" + UUID.randomUUID();

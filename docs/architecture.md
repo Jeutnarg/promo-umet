@@ -18,6 +18,8 @@ Rule semantics are documented in the [README](../README.md#rule-semantics).
 
 ## Search
 
+Optimization and administrator test-set execution share an instance-local semaphore. Its default capacity is 10; configure the positive integer `sandbox.calculation-concurrency` through `CALCULATION_CONCURRENCY` and restart the backend to change it. Admission fails immediately with HTTP 429 when the pool is full. Permits are released in `finally`, including failures. Ordinary cart evaluation and checkout pricing remain outside this pool, and the setting does not impose per-user fairness or a cluster-wide limit.
+
 The optimizer enumerates subsets, narrow-scope line targets, and maximum-cardinality BOGO matchings and exhaustive BOGO triple groupings in deterministic order. It prunes invalid partial selections. The empty selection is always a feasible initial incumbent. Every candidate passes through the same evaluator as manual checkout.
 
 Suggest minimizes total. Swindle lexicographically maximizes units with positive allocated savings, then minimizes total savings. Zero-priced units cannot contribute positive coverage; shipping never counts as a merchandise unit. Exact ties use stable serialized selection identifiers. Search completion proves optimality; a two-second deadline returns the best feasible incumbent and explicitly marks unproven objectives. Complete unit coverage independently proves maximum coverage. The budget bounds search work, not network/persistence latency.

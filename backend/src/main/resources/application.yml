@@ -23,6 +23,7 @@ logging:
     format:
       console: ecs
 sandbox:
+  calculation-concurrency: ${CALCULATION_CONCURRENCY:10}
   table: ${TABLE_NAME:promotion-sandbox}
   region: ${AWS_REGION:us-east-1}
   issuer: ${OIDC_ISSUER:http://localhost:8080/realms/sandbox}

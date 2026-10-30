@@ -93,7 +93,8 @@ class DynamoStoreTest {
 								mapper,
 								engine,
 								new dev.promo.domain.Optimizer(engine),
-								java.time.Clock.fixed(Fixtures.NOW, java.time.ZoneOffset.UTC));
+								java.time.Clock.fixed(Fixtures.NOW, java.time.ZoneOffset.UTC),
+								10);
 				var cart =
 						service.createCart(
 								"owner",
@@ -109,7 +110,8 @@ class DynamoStoreTest {
 								mapper,
 								engine,
 								new dev.promo.domain.Optimizer(engine),
-								java.time.Clock.fixed(Fixtures.NOW, java.time.ZoneOffset.UTC));
+								java.time.Clock.fixed(Fixtures.NOW, java.time.ZoneOffset.UTC),
+								10);
 				assertThat(restarted.listOrders("owner")).containsExactly(order);
 				assertThat(restarted.submitOrder("owner", quote.id(), order.id())).isEqualTo(order);
 				assertThatThrownBy(

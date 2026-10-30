@@ -138,6 +138,27 @@ docker compose down         # remove containers; retain data volumes
 
 For container-only backend tests: `docker compose run --rm backend-tests`. To permanently reset **Compose** data, run `docker compose down --volumes`; the next startup recreates seed data and accounts.
 
+### Configure calculation concurrency
+
+The default is **10 concurrent calculation requests per backend instance**. Suggest, Swindle and administrator test-set runs share this pool; one test-set run holds one slot for its entire run. When all slots are occupied, another calculation request receives HTTP **429**. Ordinary cart evaluation and checkout pricing do not use this pool.
+
+Set the **positive integer** environment variable `CALCULATION_CONCURRENCY` before starting the backend, then restart to apply changes. The Spring property is `sandbox.calculation-concurrency` (also available as `--sandbox.calculation-concurrency=20` for direct Spring Boot startup). Zero, negative and non-integer values fail startup.
+
+PowerShell, using the native launcher:
+
+```powershell
+$env:CALCULATION_CONCURRENCY = '20'
+node scripts/local.mjs start
+```
+
+macOS/Linux:
+
+```sh
+CALCULATION_CONCURRENCY=20 node scripts/local.mjs start
+```
+
+Compose forwards the same variable; set it in your shell or `.env` before `docker compose up --build -d`. Optional AWS deployment exposes Terraform input `calculation_concurrency`, also defaulting to 10. Each backend instance has its own pool, so multiple replicas multiply total capacity; this setting is not a per-user throttle.
+
 ## Verify offline operation
 
 For the native path, finish `node scripts/local.mjs setup` while connected, stop the launcher, disconnect from the internet, and run `node scripts/local.mjs start`. Check customer/admin login, checkout and administrator tests using the local URLs. `node scripts/local.mjs start --smoke` is a shorter readiness check: it starts all five services, waits for readiness, and stops them while preserving data. It does not exercise browser login.
@@ -186,5 +207,5 @@ Existing orders are migrated into the purchase ledger once on startup, and their
 - Amount inputs are at most 100,000,000 cents; quantities are at most 1,000 per line.
 - Imports and HTTP write bodies are at most 256 KiB; stored documents are at most 350,000 bytes.
 - Test sets contain at most 100 cases; a run includes at most 10 optimization cases.
-- Optimization has a two-second search budget and four concurrent calculation slots per backend instance. Unproven results are labeled explicitly.
+- Optimization has a two-second search budget and a configurable limit of 10 concurrent calculation slots per backend instance by default. Unproven results are labeled explicitly.
 - Confirmation quotes expire after five minutes. Expiration or changed inputs requires refreshed confirmation.

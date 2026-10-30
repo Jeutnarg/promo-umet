@@ -34,6 +34,8 @@ Terraform stores infrastructure identifiers in state. Use a private, encrypted r
 
 ## Operations
 
+`calculation_concurrency` defaults to **10** and sets `CALCULATION_CONCURRENCY` in each Spring Boot task. Pass, for example, `-var='calculation_concurrency=20'` alongside your other Terraform inputs to change it; applying the changed task definition rolls out the new setting. The value must be a positive 32-bit integer. Suggest, Swindle and administrator test runs share that instance's pool; excess requests receive HTTP 429. This does not limit ordinary pricing or provide per-user throttling, and total capacity grows with the number of tasks.
+
 The purchase-ledger upgrade performs a one-time table scan to index existing owner order snapshots and remove purchased carts. The task role includes table-scoped `dynamodb:Scan` for this migration; normal dashboard reads use `Query`. For the first deployment of this upgrade, stop all older backend tasks before starting the updated service so legacy writers cannot create orders after migration. Keep the data table and volumes; no data reset is needed.
 
 Application logs go to CloudWatch with 30-day retention. Alarms cover sustained CPU use and target HTTP 5xx errors. Connect alarm actions to your notification destination when provisioning operational alerts. These resources define alarms but do not invent an email address or notification subscription.

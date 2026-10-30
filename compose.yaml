@@ -33,6 +33,7 @@ services:
     build: ./backend
     environment:
       SPRING_PROFILES_ACTIVE: local
+      CALCULATION_CONCURRENCY: ${CALCULATION_CONCURRENCY:-10}
       DYNAMO_ENDPOINT: http://dynamodb:8000
       OIDC_ISSUER: http://localhost:8080/realms/sandbox
       OIDC_JWKS: http://keycloak:8080/realms/sandbox/protocol/openid-connect/certs

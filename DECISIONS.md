@@ -11,6 +11,7 @@ Almost any website works with the frontend-backend-resource architecture paradig
 No framework seemed to provide the necessary transparency or flexibility: it was easier to self-supply. 
 Manual selection, optimization, confirmation, checkout and administrator fixtures use that engine.
 Java 21/Spring Boot handles HTTP, authentication and orchestration.
+Limiting the concurrent heavy calculations is a bit of a temporary hack and should be chucked once we have a proper rate limiter.
 
 **Separate FE applications for admin and customer** 
 At a slight overhead cost, we have two React/TypeScript applications which share components and generated OpenAPI contracts. 
@@ -32,7 +33,7 @@ Suggest and Swindle enumerate compatible selections, targets and groupings throu
 Aside from any other concerns, the search budget absolutely cannot be unbounded: that's a disaster waiting to happen.
 Always claiming an optimum from a greedy heuristic was rejected; unlimited exhaustive search was also rejected because grouping choices grow combinatorially.
 The accepted compromise is a verified best-so-far candidate with explicit proof status.
-Four calculation slots protect each backend instance, but they do not provide fairness or a complete request-time limit. 
+A configurable calculation limit (10 slots by default) protects each backend instance, but it does not provide fairness or a complete request-time limit.
 With more time, reuse validated structures, precompute eligibility, add stronger pruning and isolate search from checkout capacity.
 
 **DynamoDB documents with conditional transactions.** The same storage adapter serves DynamoDB Local and AWS.

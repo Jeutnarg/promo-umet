@@ -41,7 +41,7 @@ class SandboxServiceTest {
 	private final Optimizer optimizer = mock(Optimizer.class);
 	private final ObjectMapper mapper = new ObjectMapper().findAndRegisterModules();
 	private final SandboxService service =
-			new SandboxService(store, mapper, engine, optimizer, Clock.fixed(NOW, ZoneOffset.UTC));
+			new SandboxService(store, mapper, engine, optimizer, Clock.fixed(NOW, ZoneOffset.UTC), 10);
 
 	@Test
 	void creationPassesInputsToEngineAndPersistsItsCart() throws Exception {

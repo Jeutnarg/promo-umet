@@ -238,9 +238,10 @@ resource "aws_ecs_task_definition" "backend" {
     name         = "backend", image = "${aws_ecr_repository.backend.repository_url}:${var.backend_image_tag}", essential = true,
     portMappings = [{ containerPort = 8081, protocol = "tcp" }],
     environment = [for key, value in {
-      SPRING_PROFILES_ACTIVE = "aws", TABLE_NAME = aws_dynamodb_table.data.name, AWS_REGION = var.region,
-      OIDC_ISSUER            = local.issuer, OIDC_JWKS = "${local.issuer}/.well-known/jwks.json", OIDC_AUDIENCE = aws_cognito_user_pool_client.web.id,
-      CORS_ORIGINS           = "${local.customer},${local.admin}", AWS_EC2_METADATA_DISABLED = "true"
+      SPRING_PROFILES_ACTIVE  = "aws", TABLE_NAME = aws_dynamodb_table.data.name, AWS_REGION = var.region,
+      CALCULATION_CONCURRENCY = tostring(var.calculation_concurrency),
+      OIDC_ISSUER             = local.issuer, OIDC_JWKS = "${local.issuer}/.well-known/jwks.json", OIDC_AUDIENCE = aws_cognito_user_pool_client.web.id,
+      CORS_ORIGINS            = "${local.customer},${local.admin}", AWS_EC2_METADATA_DISABLED = "true"
     } : { name = key, value = value }],
     logConfiguration = { logDriver = "awslogs", options = { awslogs-group = aws_cloudwatch_log_group.backend.name, awslogs-region = var.region, awslogs-stream-prefix = "backend" } }
   }])

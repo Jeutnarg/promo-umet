@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Semaphore;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 /** Coordinates owner-scoped persistence, pricing, quotes, and order submission. */
@@ -40,7 +41,7 @@ public class SandboxService {
 	private final PricingEngine engine;
 	private final Optimizer optimizer;
 	private final Clock clock;
-	private final Semaphore calculations = new Semaphore(4);
+	private final Semaphore calculations;
 
 	/** Combines a saved cart with its current price explanation. */
 	public record CartView(Cart cart, Evaluation evaluation) {}
@@ -58,12 +59,20 @@ public class SandboxService {
 	private record Catalog(long version, List<Promotion> promotions) {}
 
 	public SandboxService(
-			Store store, ObjectMapper mapper, PricingEngine engine, Optimizer optimizer, Clock clock) {
+			Store store,
+			ObjectMapper mapper,
+			PricingEngine engine,
+			Optimizer optimizer,
+			Clock clock,
+			@Value("${sandbox.calculation-concurrency:10}") int calculationConcurrency) {
+		Rules.validateCondition(
+				calculationConcurrency >= 1, "Calculation concurrency must be at least 1");
 		this.store = store;
 		this.mapper = mapper;
 		this.engine = engine;
 		this.optimizer = optimizer;
 		this.clock = clock;
+		calculations = new Semaphore(calculationConcurrency);
 	}
 
 	public List<ItemView> listItems(String owner) {

@@ -1,5 +1,6 @@
 # Local toolchains and development runtimes
 /.tools/
+/.local/
 
 # Java and frontend build output
 target/

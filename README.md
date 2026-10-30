@@ -1,3 +1,4 @@
+reqs not read
 # Promotion Studio
 
 A transparent promotion sandbox: Spring Boot / Java 21, DynamoDB, two React/TypeScript frontends, and OIDC. Orders are simulated; there is no payment, inventory, fulfillment, or tax integration.
@@ -6,60 +7,89 @@ A transparent promotion sandbox: Spring Boot / Java 21, DynamoDB, two React/Type
 
 Promotion Studio lets customers build reusable item catalogs, try combinations of promotions, compare Suggest and Swindle results, and submit simulated purchases with detailed price explanations. Administrators manage typed promotions, run saved pricing scenarios, and review actual promotion usage and costs. Customer and administrator applications share one Java pricing engine and run entirely locally with DynamoDB Local and Keycloak.
 
+**Quick start without Docker:** with JDK 21, Node.js 22.12+ (including npm), and `tar` installed, run these commands from the repository root:
+
+```sh
+node scripts/local.mjs setup
+node scripts/local.mjs start
+```
+
+Open http://localhost:3000 and sign in as `customer` / `customer-password`. Keep the terminal open; Ctrl+C stops the services. [Complete setup, administrator credentials, restart, logs and troubleshooting](#run-locally--no-external-accounts) are below.
+
 ## Development and tests
 
-Java follows the [Google Java Style Guide](https://google.github.io/styleguide/javaguide.html) with the project's explicit override of tabs (two-column tab width). Every Java source, including tests, uses this convention. Set `JAVA_HOME` to Java 21 and `GOOGLE_JAVA_FORMAT_JAR` to the `google-java-format` 1.28.0 all-dependencies JAR, then run `node scripts/format-java.mjs` or `node scripts/format-java.mjs --check` from the repository root. CI checks the same formatting. Record accessors and framework override names retain their standard names; application methods use descriptive verbs. Java enum constants use uppercase names; Jackson annotations preserve the existing lowercase JSON values.
+For the quickest start, follow [Run locally — no external accounts](#run-locally--no-external-accounts) below. Docker is optional. All commands assume the repository root unless a block changes directories.
 
-Container-only backend tests:
+Java code follows the [Google Java Style Guide](https://google.github.io/styleguide/javaguide.html). Set `JAVA_HOME` to JDK 21 and `GOOGLE_JAVA_FORMAT_JAR` to the `google-java-format` 1.28.0 all-dependencies JAR, then run `node scripts/format-java.mjs --check`. CI checks the same formatting.
 
-```sh
-docker compose run --rm backend-tests
-```
+Backend checks use the committed Maven Wrapper; installing Maven is unnecessary. With the local stack running, include real DynamoDB tests:
 
-Optional host development requires Java 21 and Node 22.12+; Maven is provided by the wrapper:
+PowerShell:
 
-```sh
-docker compose up -d dynamodb keycloak
+```powershell
+$env:DYNAMO_TEST_ENDPOINT = 'http://localhost:8000'
 cd backend
-./mvnw verify
-./mvnw spring-boot:run
+.\mvnw.cmd -B verify
+cd ..
 ```
 
-On Windows use `mvnw.cmd`. In a second terminal:
+macOS/Linux:
+
+```sh
+cd backend
+DYNAMO_TEST_ENDPOINT=http://localhost:8000 sh ./mvnw -B verify
+cd ..
+```
+
+Leave `DYNAMO_TEST_ENDPOINT` unset to run infrastructure-independent backend tests; database integration tests are then explicitly skipped. If Windows reports a locked application JAR during packaging, stop the native stack with Ctrl+C before building.
+
+Frontend checks (with the local stack running for browser tests):
 
 ```sh
 cd frontend
-npm ci
 npm run generate
 npm run build
-cd ..
-node scripts/serve.mjs customer 3000
-# In another terminal:
-node scripts/serve.mjs admin 3001
-```
-
-`npm run generate` derives shared TypeScript contracts from `backend/target/openapi.json`, which the backend component tests export. Commit `frontend/src/generated/schema.ts` with contract changes. The frontends share components, authentication and API transport; their separate runtime configurations select customer/admin entry experiences. `build:customer` and `build:admin` produce independently deployable outputs.
-
-For real DynamoDB adapter tests, set `DYNAMO_TEST_ENDPOINT=http://localhost:8000` before `mvnw verify`; otherwise those tests are explicitly skipped. Component tests use an in-memory transactional test double behind the production repository boundary, inject failures at each resource-access prefix, and require no infrastructure.
-
-```sh
-cd frontend
 npx playwright install chromium
 npm run test:e2e
 npm audit --audit-level=moderate
+cd ..
 ```
 
-See [architecture](docs/architecture.md), [capacity and retention](docs/capacity-and-retention.md), [test evidence](docs/verification.md), and [AWS deployment](infra/aws/README.md).
+The browser installation and advisory check need internet access. Linux browser tests may also require Playwright's documented OS packages. `npm run generate` derives contracts from `backend/target/openapi.json`, exported by the backend component tests; commit generated changes. Normal startup uses the committed contracts and does not require browser test tooling. The two frontends share components, authentication and API transport; `build:customer` and `build:admin` produce independent deployment outputs.
 
-The backend provides correlated JSON request, database, pricing and exception logs plus administrator-only performance metrics. Every response includes `X-Request-ID`. See [service observability](docs/observability.md) for event fields, timing definitions, privacy behavior and ready-to-use investigation queries.
+See [architectural decisions](DECISIONS.md), [architecture](docs/architecture.md), [capacity and retention](docs/capacity-and-retention.md), [test evidence](docs/verification.md), and [AWS deployment](infra/aws/README.md). The backend provides correlated JSON request/database/pricing logs, `X-Request-ID`, and administrator-only metrics; [observability documentation](docs/observability.md) explains them.
 
 ## Run locally — no external accounts
 
-Install a container runtime with Docker Compose support and start its engine. No Docker Hub login, AWS account, cloud credentials, external identity account, or SaaS subscription is required. First setup downloads public images and packages; running the built system needs no internet access.
+### Recommended: without Docker
+
+Install these prerequisites once, then open a **new terminal in this repository's root directory**:
+
+- **JDK 21**, including development tools: [Temurin 21 downloads](https://adoptium.net/temurin/releases/?version=21). Set `JAVA_HOME` to its installation directory, or make Java 21 available on `PATH`.
+- **Node.js 22.12 or newer**, including npm: [Node.js downloads](https://nodejs.org/en/download).
+- **tar**, included with current Windows and macOS installations; install your distribution's `tar` package on Linux if missing.
+
+Check the installed tools:
 
 ```sh
-docker compose up --build -d --wait
+java -version
+node --version
+npm --version
+tar --version
 ```
+
+`java -version` must report **21**. If several JDKs are installed, set `JAVA_HOME` to JDK 21; the launcher uses that installation even when another Java is on `PATH`. Keycloak supports [OpenJDK 21](https://www.keycloak.org/server/supported-configurations). No host Maven installation, AWS CLI, Docker, or external account is needed.
+
+**First setup** (the same commands work in PowerShell, macOS and Linux terminals):
+
+```sh
+node scripts/local.mjs setup
+node scripts/local.mjs start
+```
+
+`setup` downloads pinned **Keycloak 26.8.1** and **DynamoDB Local 2.6.1** archives from their public publishers, verifies their SHA-256 checksums, downloads Maven through the wrapper, installs npm packages and builds both applications. It does not run the test suite. First setup requires internet access and can take several minutes. It is repeatable and preserves saved data.
+
+`start` launches **DynamoDB Local, Keycloak, Spring Boot, the customer frontend and the administrator frontend** as supervised native processes. It checks ports and waits for database, realm and application readiness before printing the URLs. Keep this one terminal open; separate service terminals are unnecessary. Startup uses existing artifacts and local endpoints, so after successful setup it needs no internet connection.
 
 | Application | URL | Local credentials |
 |---|---|---|
@@ -69,22 +99,50 @@ docker compose up --build -d --wait
 | Backend health | http://localhost:8081/actuator/health | Public |
 | OpenAPI | http://localhost:8081/v3/api-docs | Public |
 
-The startup imports a local Keycloak realm, users, roles and PKCE client, creates the DynamoDB table, and seeds two sample items, three promotions, and the **$54 sketch** test set. Initialization preserves existing data. Seed passwords are exclusively for the localhost development profile. Create more local accounts and assign realm roles through Keycloak; neither email delivery nor an external identity provider is needed.
+Open the customer/admin URL and click **Sign in to your workspace**, then use the corresponding credentials. Use `localhost` in browser URLs because OIDC redirect addresses must match. Tokens stay in memory; after a page refresh, click sign-in again to resume the local Keycloak session. Create extra accounts and assign realm roles through the local Keycloak administration page; email delivery is unnecessary.
 
-Use `localhost`, rather than `127.0.0.1`, in browser URLs: OIDC redirect URIs are exact. Sessions keep bearer tokens in browser memory; a refresh may show the sign-in screen again, and Keycloak's local session resumes authentication without reentering credentials. User work stays in DynamoDB.
+The first startup imports the realm, customer/admin accounts and PKCE client, creates the application table, and seeds sample items, promotions and the **$54 sketch** test set. Later startups preserve edits and purchases. Development credentials stay confined to local setup.
+
+**Stop and restart:** press **Ctrl+C** in the launcher terminal to stop all five child services. To resume, run only:
+
+```sh
+node scripts/local.mjs start
+```
+
+**After changing code:** stop the stack, rerun `node scripts/local.mjs setup` to rebuild, and run `node scripts/local.mjs start` again. Existing downloaded runtimes are reused. Builds may need internet for any newly introduced dependencies.
+
+**Storage and logs:** native databases live in `.local/data/0/`; cached runtimes/downloads live in `.local/tools/` and `.local/downloads/`. Service logs are `.local/logs/0/{dynamodb,keycloak,backend,customer,admin}.log`. The entire `.local/` directory is ignored by Git. Read a log with `Get-Content .local/logs/0/backend.log -Tail 30 -Wait` in PowerShell or `tail -f .local/logs/0/backend.log` on macOS/Linux.
+
+**Troubleshooting:** run `node scripts/local.mjs check` to check Java/Node and the six required ports (3000, 3001, 8000, 8080, 8081, and Keycloak's management port 9000). Stop older native processes or the Compose stack if a port is occupied; the launcher never kills an unrelated listener. If a service fails, inspect its named log. Frontends, Spring Boot and Keycloak bind to loopback; DynamoDB Local has no bind-host option, so keep its development port private.
+
+For an isolated second dataset, set `LOCAL_PORT_OFFSET` before starting; for example, PowerShell `$env:LOCAL_PORT_OFFSET='100'` or macOS/Linux `LOCAL_PORT_OFFSET=100 node scripts/local.mjs start`. All six ports shift by that amount, OIDC/frontend URLs follow it, and data/logs use `.local/data/100/` and `.local/logs/100/`. Start only one launcher at a time because the downloaded Keycloak runtime is shared.
+
+**Reset native data:** stop the launcher first. Delete only `.local/data/0/` to remove native customer/admin data and locally created Keycloak accounts while keeping downloaded tools. PowerShell: `Remove-Item -LiteralPath '.local/data/0' -Recurse -Confirm`; macOS/Linux: `rm -ri .local/data/0`. The next start imports the development accounts and seed data again. Native data and Compose volumes are independent; resetting one does not reset the other.
+
+### Optional: Docker Compose
+
+If you prefer containers, install a container runtime with Compose support, start its engine, and run:
+
+```sh
+docker compose up --build -d --wait
+```
+
+Use the same URLs and credentials above. No registry login or external account is required. Public images/packages need internet for the initial build; fonts and other runtime assets are bundled. Do not run native and Compose services on the same ports simultaneously.
 
 ```sh
 docker compose logs -f backend
-docker compose stop          # keep containers and data
+docker compose stop          # stop; retain containers and saved data
 docker compose start        # resume
-docker compose down         # remove containers; keep data volumes
+docker compose down         # remove containers; retain data volumes
 ```
 
-**Reset local data:** `docker compose down --volumes` permanently deletes this project's local carts, orders, test sets, and Keycloak accounts. The next startup recreates the seed data.
+For container-only backend tests: `docker compose run --rm backend-tests`. To permanently reset **Compose** data, run `docker compose down --volumes`; the next startup recreates seed data and accounts.
 
 ## Verify offline operation
 
-Build application and test images while connected:
+For the native path, finish `node scripts/local.mjs setup` while connected, stop the launcher, disconnect from the internet, and run `node scripts/local.mjs start`. Check customer/admin login, checkout and administrator tests using the local URLs. `node scripts/local.mjs start --smoke` is a shorter readiness check: it starts all five services, waits for readiness, and stops them while preserving data. It does not exercise browser login.
+
+For stronger automated network isolation using the optional Compose path, build application and test images while connected:
 
 ```sh
 docker compose --profile test build

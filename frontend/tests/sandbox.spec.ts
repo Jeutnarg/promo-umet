@@ -117,6 +117,129 @@ async function addCatalogItem(page: Page, name: string) {
     page.getByRole("status").filter({ hasText: "Updating" }),
   ).toHaveCount(0);
 }
+test("bogo triple editor, eligibility, add-ons and immutable checkout work locally", async ({
+  page,
+  context,
+}) => {
+  let authorization = "";
+  page.on("request", (request) => {
+    if (request.url().includes("/api/v1/"))
+      authorization = request.headers()["authorization"] || authorization;
+  });
+  await createFreshCustomerCart(page);
+  const stamp = Date.now();
+  const category = `Triple treats ${stamp}`;
+  const items = [
+    {
+      id: crypto.randomUUID(),
+      name: `Big treat ${stamp}`,
+      price: 1000,
+      category,
+    },
+    {
+      id: crypto.randomUUID(),
+      name: `Little treat ${stamp}`,
+      price: 200,
+      category,
+    },
+  ];
+  for (const item of items) {
+    const saved = await context.request.put(
+      `http://localhost:8081/api/v1/items/${item.id}`,
+      { headers: { authorization }, data: { item, version: 0 } },
+    );
+    expect(saved.ok()).toBeTruthy();
+  }
+  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await signInToWorkspace(page, "admin", "admin");
+  const adminAuthorization = authorization;
+  const name = `Triple offer ${stamp}`;
+  await page.getByLabel("Name", { exact: true }).fill(name);
+  await page
+    .getByRole("combobox", { name: "Strategy", exact: true })
+    .selectOption("bogotriple");
+  await expect(page.getByLabel("Customer description")).toHaveValue(
+    /two add-ons free/,
+  );
+  await page
+    .getByLabel("Target item IDs", { exact: false })
+    .fill(items.map((item) => item.id).join(","));
+  await page.getByLabel("Target categories", { exact: false }).fill(category);
+  await page.getByLabel("Customer description").fill("Three little delights.");
+  const savedPromotion = page.waitForResponse(
+    (response) =>
+      response.request().method() === "PUT" &&
+      response.url().includes("/admin/promotions/"),
+  );
+  await page
+    .getByRole("button", { name: "Save promotion", exact: true })
+    .click();
+  const promotion = await (await savedPromotion).json();
+  expect(promotion.strategy).toBe("bogotriple");
+  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await createFreshCustomerCart(page);
+  const offer = page.locator(".promotion").filter({ hasText: name });
+  await expect(offer).toHaveClass(/promotion-unavailable/);
+  await expect(offer.getByRole("checkbox")).toBeDisabled();
+  await expect(offer).toContainText(items[0].name);
+  await expect(offer).toContainText(items[1].name);
+  await expect(offer).toContainText(category);
+  await expect(offer).toContainText("Three little delights.");
+  for (const item of items) await expect(offer).not.toContainText(item.id);
+  await addCatalogItem(page, items[0].name);
+  await expect(
+    offer.getByRole("button", { name: "Too good to pass up!" }),
+  ).toHaveAttribute("title", `2 × ${items[1].name}`);
+  await offer.getByRole("button", { name: "Too good to pass up!" }).click();
+  await expect(
+    page.getByRole("heading", { name: "In your cart (3)" }),
+  ).toBeVisible();
+  await expect(offer.getByRole("checkbox")).toBeEnabled();
+  await expect(offer).not.toHaveClass(/promotion-unavailable/);
+  await offer.getByRole("checkbox").click();
+  await expect(offer.getByRole("checkbox")).toBeChecked();
+  await expect(page.locator(".summary-panel .grand-total")).toContainText(
+    "$20.00",
+  );
+  await page.screenshot({
+    path: "test-results/bogo-triple-cart.png",
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "Checkout →" }).click();
+  await page.getByRole("button", { name: "Buy Buy Buy" }).click();
+  await expect(
+    page.getByRole("heading", { name: "All set. Nicely saved." }),
+  ).toBeVisible();
+  const orders = await (
+    await context.request.get("http://localhost:8081/api/v1/orders", {
+      headers: { authorization },
+    })
+  ).json();
+  const purchased = orders.find((order: { promotions: { id: string }[] }) =>
+    order.promotions.some((p) => p.id === promotion.id),
+  );
+  expect(
+    purchased.evaluation.steps.find(
+      (step: { promotionId: string }) => step.promotionId === promotion.id,
+    ).saving,
+  ).toBe(400);
+  expect(
+    purchased.promotions.find((p: { id: string }) => p.id === promotion.id)
+      .strategy,
+  ).toBe("bogotriple");
+  await page.screenshot({
+    path: "test-results/bogo-triple-purchase.png",
+    fullPage: true,
+  });
+  const disabled = await context.request.put(
+    `http://localhost:8081/api/v1/admin/promotions/${promotion.id}`,
+    {
+      headers: { authorization: adminAuthorization },
+      data: { ...promotion, enabled: false },
+    },
+  );
+  expect(disabled.ok()).toBeTruthy();
+});
 test.beforeEach(async ({ context }) => {
   await context.route("**/*", (route) => {
     const url = new URL(route.request().url());

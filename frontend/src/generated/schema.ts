@@ -399,7 +399,7 @@ export interface components {
             /** @enum {string} */
             exclusivity: "stackable" | "units" | "order";
             /** @enum {string} */
-            strategy: "bogo" | "flat" | "percent" | "fixedprice" | "flatgoal" | "shippinggoal" | "rainbowpercent";
+            strategy: "bogo" | "bogotriple" | "flat" | "percent" | "fixedprice" | "flatgoal" | "shippinggoal" | "rainbowpercent";
             details: components["schemas"]["Details"];
             itemIds: string[];
             categories: string[];

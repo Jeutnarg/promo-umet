@@ -211,7 +211,9 @@ public final class PricingEngine {
 		var targets =
 				new ArrayList<>(
 						units.values().stream().filter(unit -> lineIds.contains(unit.line)).toList());
-		if (promotion.scope() == Scope.ORDER && promotion.strategy() != Strategy.BOGO) {
+		if (promotion.scope() == Scope.ORDER
+				&& promotion.strategy() != Strategy.BOGO
+				&& promotion.strategy() != Strategy.BOGO_TRIPLE) {
 			targets.add(units.get("shipping"));
 		}
 		return targets;
@@ -233,6 +235,23 @@ public final class PricingEngine {
 				deltas.put(free.id, free.remaining);
 				affected.add(first.id);
 				affected.add(second.id);
+			}
+		} else if (promotion.strategy() == Strategy.BOGO_TRIPLE) {
+			var balances =
+					targets.stream().map(unit -> new BogoTriple.Balance(unit.id, unit.remaining)).toList();
+			for (var group : BogoTriple.resolveGroups(balances, selection.pairs())) {
+				var sorted =
+						group.stream()
+								.map(units::get)
+								.sorted(
+										Comparator.<Unit>comparingLong(unit -> unit.remaining)
+												.thenComparing(unit -> unit.id))
+								.toList();
+				for (int index = 0; index < 2; index++) {
+					var free = sorted.get(index);
+					deltas.put(free.id, free.remaining);
+				}
+				affected.addAll(group);
 			}
 		} else {
 			targets.forEach(unit -> affected.add(unit.id));

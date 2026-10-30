@@ -7,7 +7,15 @@ import {
   formatMoney,
   createUniqueId,
 } from "./api";
-import { generatePromotionDescription } from "./promotion-description";
+import {
+  generatePromotionDescription,
+  describePromotionTargets,
+} from "./promotion-description";
+import {
+  addOfferItems,
+  canPromotionApply,
+  findOfferAdditions,
+} from "./promotion-eligibility";
 import { createRandomCart } from "./random-cart";
 import { Breakdown, Trace } from "./components";
 import type {
@@ -710,77 +718,162 @@ export function Customer() {
                       (!p.expiresAt ||
                         new Date(p.expiresAt).getTime() > Date.now()),
                   )
-                  .map((p) => (
-                    <div className="promotion" key={p.id}>
-                      <label className="check-label">
-                        <input
-                          type="checkbox"
-                          checked={view.cart.selections.some(
-                            (s) => s.promotionId === p.id,
-                          )}
-                          onChange={() => togglePromotion(p)}
-                        />
-                        <span>
-                          <b>{p.name}</b>
-                          <small>
-                            {p.description || generatePromotionDescription(p)}
-                          </small>
-                        </span>
-                      </label>
-                      {(p.scope === "oneitem" || p.scope === "item") && (
-                        <select
-                          aria-label={`${p.name} target`}
-                          value={
-                            targets[p.id] ||
-                            view.cart.selections.find(
+                  .map((p) => {
+                    const applicable = canPromotionApply(
+                      p,
+                      view.cart,
+                      view.evaluation,
+                      promotions,
+                    );
+                    const additions = applicable
+                      ? undefined
+                      : findOfferAdditions(
+                          p,
+                          view.cart,
+                          view.evaluation,
+                          promotions,
+                          items,
+                        );
+                    const selected = view.cart.selections.some(
+                      (s) => s.promotionId === p.id,
+                    );
+                    return (
+                      <div
+                        className={`promotion${applicable ? "" : " promotion-unavailable"}`}
+                        key={p.id}
+                      >
+                        <label className="check-label">
+                          <input
+                            type="checkbox"
+                            disabled={!applicable && !selected}
+                            checked={view.cart.selections.some(
                               (s) => s.promotionId === p.id,
-                            )?.lineId ||
-                            ""
-                          }
-                          onChange={(e) => {
-                            setTargets({ ...targets, [p.id]: e.target.value });
-                            if (
-                              view.cart.selections.some(
-                                (s) => s.promotionId === p.id,
+                            )}
+                            onChange={() => togglePromotion(p)}
+                          />
+                          <span>
+                            <b>{p.name}</b>
+                            <small
+                              className="promotion-description"
+                              tabIndex={0}
+                            >
+                              {p.description || generatePromotionDescription(p)}
+                              <span className="promotion-targets">
+                                {describePromotionTargets(
+                                  p,
+                                  items,
+                                  view.cart.lines,
+                                )}
+                              </span>
+                            </small>
+                          </span>
+                        </label>
+                        {!applicable && (
+                          <p className="muted small">
+                            This offer needs different items, quantities, or
+                            remaining prices to save on this cart.
+                          </p>
+                        )}
+                        {additions && (
+                          <button
+                            className="offer-add-items"
+                            title={additions
+                              .map(
+                                ({ item, quantity }) =>
+                                  `${quantity} × ${item.name}`,
                               )
-                            )
+                              .join(", ")}
+                            onClick={() =>
                               void runWorkspaceTask(async () => {
-                                const cart = current.current!.cart;
-                                await persistCart({
-                                  ...cart,
-                                  selections: cart.selections.map((s) =>
-                                    s.promotionId === p.id
-                                      ? {
-                                          ...s,
-                                          lineId: e.target.value,
-                                          pairs: [],
-                                        }
-                                      : s,
-                                  ),
-                                });
+                                const next = addOfferItems(
+                                  current.current!.cart,
+                                  additions,
+                                );
+                                // New line identifiers are generated per cart; customers only see names.
+                                next.lines = next.lines.map((line) =>
+                                  current.current!.cart.lines.some(
+                                    (existing) => existing.id === line.id,
+                                  )
+                                    ? line
+                                    : { ...line, id: createUniqueId() },
+                                );
+                                await persistCart(next);
+                              })
+                            }
+                          >
+                            Too good to pass up!
+                          </button>
+                        )}
+                        {additions && (
+                          <p className="small offer-addition-summary">
+                            Adds{" "}
+                            {additions
+                              .map(
+                                ({ item, quantity }) =>
+                                  `${quantity} × ${item.name}`,
+                              )
+                              .join(", ")}
+                            . Review the updated offer before selecting it.
+                          </p>
+                        )}
+                        {(p.scope === "oneitem" || p.scope === "item") && (
+                          <select
+                            aria-label={`${p.name} target`}
+                            value={
+                              targets[p.id] ||
+                              view.cart.selections.find(
+                                (s) => s.promotionId === p.id,
+                              )?.lineId ||
+                              ""
+                            }
+                            onChange={(e) => {
+                              setTargets({
+                                ...targets,
+                                [p.id]: e.target.value,
                               });
-                          }}
-                        >
-                          <option value="">
-                            Automatically choose an eligible item
-                          </option>
-                          {view.cart.lines
-                            .filter(
-                              (l) =>
-                                (!p.itemIds.length ||
-                                  p.itemIds.includes(l.itemId)) &&
-                                (!p.categories.length ||
-                                  p.categories.includes(l.category)),
-                            )
-                            .map((l) => (
-                              <option key={l.id} value={l.id}>
-                                {l.name}
-                              </option>
-                            ))}
-                        </select>
-                      )}
-                    </div>
-                  ))}
+                              if (
+                                view.cart.selections.some(
+                                  (s) => s.promotionId === p.id,
+                                )
+                              )
+                                void runWorkspaceTask(async () => {
+                                  const cart = current.current!.cart;
+                                  await persistCart({
+                                    ...cart,
+                                    selections: cart.selections.map((s) =>
+                                      s.promotionId === p.id
+                                        ? {
+                                            ...s,
+                                            lineId: e.target.value,
+                                            pairs: [],
+                                          }
+                                        : s,
+                                    ),
+                                  });
+                                });
+                            }}
+                          >
+                            <option value="">
+                              Automatically choose an eligible item
+                            </option>
+                            {view.cart.lines
+                              .filter(
+                                (l) =>
+                                  (!p.itemIds.length ||
+                                    p.itemIds.includes(l.itemId)) &&
+                                  (!p.categories.length ||
+                                    p.categories.includes(l.category)),
+                              )
+                              .map((l) => (
+                                <option key={l.id} value={l.id}>
+                                  {l.name}
+                                </option>
+                              ))}
+                          </select>
+                        )}
+                      </div>
+                    );
+                  })}
               </div>
             </section>
             <aside>

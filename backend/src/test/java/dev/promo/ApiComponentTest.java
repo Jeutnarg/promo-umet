@@ -51,6 +51,59 @@ import org.springframework.test.web.servlet.MockMvc;
 @org.springframework.test.context.ActiveProfiles("test")
 class ApiComponentTest {
 	@Test
+	void persistsAndRunsBogoTripleFixturesThroughVersionedApi() throws Exception {
+		// Given an administrator saves a triple offer using its public JSON strategy name.
+		var promotion =
+				new Promotion(
+						"triple-api",
+						0,
+						"Triple offer",
+						Scope.ITEMS,
+						Exclusivity.STACKABLE,
+						Strategy.BOGO_TRIPLE,
+						new Details(null, null, null, null),
+						List.of(),
+						List.of(),
+						null,
+						true,
+						1);
+		mvc.perform(
+						withAuthenticatedAdmin(put("/api/v1/admin/promotions/triple-api"))
+								.content(serializeJson(promotion)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.strategy").value("bogotriple"));
+		var cart =
+				Fixtures.createCart(
+						List.of(createLine("sponsor", 1, 1000), createLine("addons", 2, 200)),
+						new dev.promo.domain.Model.Selection(promotion.id()));
+		// When the customer evaluates the saved offer and the administrator runs an imported fixture.
+		mvc.perform(withAuthenticatedAdmin(post("/api/v1/carts")).content(serializeJson(cart)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.evaluation.total").value(2000));
+		var set =
+				new TestSet(
+						"triple-fixtures",
+						0,
+						1,
+						"Triple fixture",
+						List.of(
+								new TestCase(
+										"Two free add-ons", cart, List.of(promotion), "manual", NOW, 2000, 2)));
+		mvc.perform(
+						withAuthenticatedAdmin(put("/api/v1/admin/testsets/triple-fixtures"))
+								.content(serializeJson(set)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.cases[0].promotions[0].strategy").value("bogotriple"));
+		mvc.perform(withAuthenticatedAdmin(post("/api/v1/admin/tests/run")).content(serializeJson(set)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$[0].passed").value(true));
+		// Then persisted/exportable fixtures preserve the typed strategy.
+		mvc.perform(withAuthenticatedAdmin(get("/api/v1/admin/testsets")))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$[0].cases[0].promotions[0].strategy").value("bogotriple"));
+	}
+
+	@Test
 	void deletesOnlyOwnedCartAndCreatesEmptyReplacement() throws Exception {
 		var original =
 				service.createCart("alice", createCart(List.of(createLine("delete-me", 2, 1000))));

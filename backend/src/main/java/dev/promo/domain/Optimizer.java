@@ -13,6 +13,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Consumer;
@@ -168,6 +169,8 @@ public final class Optimizer {
 							}
 						}
 						enumerateBogoPairings(ids, new ArrayList<>(), ids.size() % 2 == 1, apply);
+					} else if (promotion.strategy() == Strategy.BOGO_TRIPLE) {
+						searchTripleApplications(promotion, target, result, apply);
 					} else {
 						apply.accept(List.of());
 					}
@@ -204,6 +207,65 @@ public final class Optimizer {
 				enumerateBogoPairings(
 						new ArrayList<>(remaining.subList(1, remaining.size())), pairs, false, consume);
 			}
+		}
+
+		void searchTripleApplications(
+				Promotion promotion, String target, Evaluation result, Consumer<List<List<String>>> apply) {
+			// Seed a feasible full application before exploring potentially many groupings.
+			apply.accept(List.of());
+			var savings = new HashMap<String, Long>();
+			result
+					.steps()
+					.forEach(
+							step ->
+									step.allocations()
+											.forEach(
+													allocation ->
+															savings.merge(allocation.unitId(), allocation.saving(), Long::sum)));
+			var balances = new ArrayList<BogoTriple.Balance>();
+			for (var line : engine.findEligibleLines(cart, promotion, target)) {
+				for (int unit = 0; unit < line.quantity(); unit++) {
+					String id = line.id() + ":" + String.format(Locale.ROOT, "%04d", unit);
+					balances.add(new BogoTriple.Balance(id, line.price() - savings.getOrDefault(id, 0L)));
+				}
+			}
+			enumerateTripleGroups(balances, new ArrayList<>(), apply);
+		}
+
+		void enumerateTripleGroups(
+				List<BogoTriple.Balance> remaining,
+				ArrayList<List<String>> groups,
+				Consumer<List<List<String>>> consume) {
+			if (hasSearchExpired()) {
+				return;
+			}
+			if (!BogoTriple.canFormGroup(remaining)) {
+				if (!groups.isEmpty()) {
+					consume.accept(List.copyOf(groups));
+				}
+				return;
+			}
+			var first = remaining.getFirst();
+			for (int second = 1; second < remaining.size() - 1; second++) {
+				for (int third = second + 1; third < remaining.size(); third++) {
+					if (hasSearchExpired()) {
+						return;
+					}
+					if (!BogoTriple.qualifies(first, remaining.get(second), remaining.get(third))) {
+						continue;
+					}
+					var rest = new ArrayList<>(remaining);
+					var last = rest.remove(third);
+					var middle = rest.remove(second);
+					rest.removeFirst();
+					groups.add(List.of(first.id(), middle.id(), last.id()));
+					enumerateTripleGroups(rest, groups, consume);
+					groups.removeLast();
+				}
+			}
+			// Unused units are checked for extendability by the shared evaluator at each leaf.
+			enumerateTripleGroups(
+					new ArrayList<>(remaining.subList(1, remaining.size())), groups, consume);
 		}
 
 		boolean isBetterCandidate(Evaluation result, List<Selection> selections) {

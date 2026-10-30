@@ -408,6 +408,7 @@ export function Admin() {
                     >
                       {[
                         "bogo",
+                        "bogotriple",
                         "flat",
                         "percent",
                         "fixedprice",
@@ -415,7 +416,9 @@ export function Admin() {
                         "shippinggoal",
                         "rainbowpercent",
                       ].map((s) => (
-                        <option key={s}>{s}</option>
+                        <option key={s} value={s}>
+                          {s === "bogotriple" ? "bogo triple" : s}
+                        </option>
                       ))}
                     </select>
                   </label>

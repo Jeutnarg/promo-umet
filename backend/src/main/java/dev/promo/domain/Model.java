@@ -24,6 +24,8 @@ public final class Model {
 	public enum Strategy {
 		@JsonProperty("bogo")
 		BOGO,
+		@JsonProperty("bogotriple")
+		BOGO_TRIPLE,
 		@JsonProperty("flat")
 		FLAT,
 		@JsonProperty("percent")
@@ -55,7 +57,7 @@ public final class Model {
 	public record Line(
 			String id, String itemId, String name, int quantity, long price, String category) {}
 
-	/** Selects a promotion, optional target line, and reproducible BOGO pairs. */
+	/** Selects a promotion, optional target line, and reproducible BOGO pairs or triples. */
 	public record Selection(String promotionId, String lineId, List<List<String>> pairs) {
 		public Selection(String id) {
 			this(id, null, List.of());

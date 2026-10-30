@@ -798,6 +798,33 @@ fieldset:disabled textarea {
 .surprise-cart {
   display: block;
 }
+.promotion-description {
+  display: block;
+  max-height: 110px;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+.promotion .check-label > span {
+  min-width: 0;
+}
+.promotion-targets {
+  display: block;
+  margin-top: 6px;
+}
+.promotion-unavailable {
+  background: #f2f2f2;
+  color: #6c6c6c;
+}
+.promotion-unavailable .check-label b {
+  color: #777;
+}
+.offer-add-items {
+  margin: 4px 0;
+}
+.offer-addition-summary {
+  margin: 4px 0;
+}
 .dashboard-metrics {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

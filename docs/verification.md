@@ -1,0 +1,33 @@
+# Verification record
+
+Latest cart-display changes: **101 backend tests and 15 browser scenarios pass**. Saved-cart summaries are owner-scoped and calculated by the server; tests verify prices, quantities, newest-first ordering, hover timestamps, aligned two-column filters, and banner clearing on manual edits.
+
+Optimizer performance checks now exercise Suggest and Swindle with 500 and 1,000 merchandise units and the supported maximum of 50 promotions. Four runs completed in approximately 2.00–2.02 seconds each, returned reproducible valid prices, and correctly reported unproven optimality. Tests also cover BOGO after an earlier discount reverses relative item prices, including zero, equality, and either pairing orientation.
+
+Java refactoring and ownership audit: **90 backend tests pass**, including 16 dedicated IDOR regressions covering all cart operations for customer and administrator identities, foreign quotes/order keys, and forged body IDs. Pricing evaluation is decomposed into validation, target resolution, proposed-discount calculation, conflict checks, allocation application, and result assembly. Formatting checks cover all Java sources with the documented tab override.
+
+Follow-up UI changes: 74 backend tests pass with DynamoDB Local enabled. The browser suite now includes 13 scenarios, adding random-cart bounds, confirmed deletion without visible internal IDs, description persistence, expiration editing, filtering, and empty-test feedback. Earlier records below describe the initial delivery.
+
+Verified locally on October 29, 2026, on Windows using Java 21.0.13 and Node 24.20.0. Runtime identity provider: Keycloak 26.8.1. Backend: Spring Boot 3.5.16. The standalone DynamoDB Local distribution used for these checks reports version 1.25.1; Compose pins DynamoDB Local 2.6.1.
+
+## Passed
+
+- **72 backend tests**, zero failures and zero skips in the infrastructure-enabled run: 22 Spring Boot component scenarios, 29 pricing tests, 11 additional pricing/search invariant cases, six signed-token validation cases, three orchestration unit tests, and a real DynamoDB adapter transaction/persistence test.
+- The component suite injects downstream storage failures at every access prefix on each endpoint's ordinary persistence path. It also verifies ownership isolation, malformed requests, body limits, stale versions, changed quotes, idempotent submission, and administrator authorization. These tests do not constitute exhaustive fault injection for every concurrent retry interleaving.
+- Pricing invariants exercise 240 seeded combinations across flat, percentage and fixed-price strategies and all four scopes. Additional tests compare subset optimization with exhaustive enumeration and cover explicit BOGO matchings, odd quantities, target selection, category thresholds, cent conservation, and Swindle's coverage objective.
+- **10 real browser scenarios** against the running backend, Keycloak and DynamoDB Local: the $54 sketch checkout, return to cart, order submission, clone/fresh cart, Suggest/Swindle, administrator fixture import/export/run, administrator editor, role restriction, login/logout, invalid bearer requests, expiration removal, persistence checkpoint, and desktop/mobile layout. Several scenarios exercise multiple related behaviors.
+- All browser scenarios reject requests to non-loopback hosts. The complete browser suite also passed after stopping and restarting the database process, with `EXPECT_PERSISTED=1` requiring the previously saved test-set marker.
+- TypeScript checking and Vite production builds pass. Raleway fonts are emitted as local assets. Desktop and 390px mobile screenshots were inspected; no horizontal overflow was detected.
+- `npm audit --audit-level=moderate`: zero reported vulnerabilities after updating Vite and Playwright.
+- Normal and offline Compose configurations parse successfully.
+- Terraform initialization, formatting checks, and validation pass without an AWS account or deployment.
+
+## Verification limits
+
+Docker's CLI is installed on this workstation, but its engine is unavailable and Docker Desktop did not start. Therefore container image builds, fresh Compose startup, and the Docker internal-network offline acceptance run were **not executed here**. Public DynamoDB and nginx image tags were checked against their registries. The real application acceptance tests used standalone local Java services and the built frontend instead.
+
+Browser external-network blocking verifies the browser dependency boundary; it is not an OS-level denial of outbound traffic from every standalone server process. The offline Compose override and CI workflow provide the stronger whole-stack network-isolation check when a container engine is available.
+
+AWS resources were not created. Terraform validation does not verify live provisioning, Cognito login, IAM behavior, DNS ownership, or cloud rollback. Run the deployment smoke checks in `infra/aws/README.md` before treating cloud hosting as verified.
+
+Generated local reports are in `backend/target/surefire-reports`, `frontend/playwright-report`, and `frontend/test-results`. These build/test artifacts are ignored by version control.

@@ -1,0 +1,98 @@
+name: promotion-sandbox
+services:
+  dynamodb:
+    image: amazon/dynamodb-local:2.6.1
+    user: root
+    command: -jar DynamoDBLocal.jar -sharedDb -dbPath /data -disableTelemetry
+    volumes:
+      - dynamodb-data:/data
+    ports:
+      - "127.0.0.1:8000:8000"
+    networks: [local]
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.1
+    command: [start-dev, --import-realm]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: local-admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: local-admin-password
+      KC_HOSTNAME: http://localhost:8080
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - keycloak-data:/opt/keycloak/data
+      - ./infra/local/realm.json:/opt/keycloak/data/import/realm.json:ro
+    networks: [local]
+    healthcheck:
+      test: [CMD, bash, -c, "exec 3<>/dev/tcp/localhost/9000; printf 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3; read -r line <&3; [[ $$line == *200* ]]"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+  backend:
+    build: ./backend
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      DYNAMO_ENDPOINT: http://dynamodb:8000
+      OIDC_ISSUER: http://localhost:8080/realms/sandbox
+      OIDC_JWKS: http://keycloak:8080/realms/sandbox/protocol/openid-connect/certs
+      AWS_EC2_METADATA_DISABLED: "true"
+    ports:
+      - "127.0.0.1:8081:8081"
+    depends_on:
+      dynamodb:
+        condition: service_started
+      keycloak:
+        condition: service_healthy
+    restart: on-failure
+    networks: [local]
+    healthcheck:
+      test: [CMD, bash, -c, "exec 3<>/dev/tcp/localhost/8081; printf 'GET /actuator/health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3; read -r line <&3; [[ $$line == *200* ]]"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+  customer:
+    build: ./frontend
+    environment:
+      APP_MODE: customer
+    ports:
+      - "127.0.0.1:3000:80"
+    depends_on: [backend]
+    networks: [local]
+  admin:
+    build: ./frontend
+    environment:
+      APP_MODE: admin
+    ports:
+      - "127.0.0.1:3001:80"
+    depends_on: [backend]
+    networks: [local]
+  backend-tests:
+    image: maven:3.9.9-eclipse-temurin-21
+    profiles: [test]
+    working_dir: /workspace
+    volumes:
+      - ./backend:/workspace
+      - maven-cache:/root/.m2
+    environment:
+      DYNAMO_TEST_ENDPOINT: http://dynamodb:8000
+    command: mvn -B verify
+    depends_on: [dynamodb]
+    networks: [local]
+  browser-tests:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.tests
+    profiles: [test]
+    volumes:
+      - ./frontend/test-results:/workspace/test-results
+      - ./frontend/playwright-report:/workspace/playwright-report
+    networks: [local]
+    depends_on: [customer, admin]
+networks:
+  local:
+volumes:
+  dynamodb-data:
+  keycloak-data:
+  maven-cache:

@@ -1,0 +1,59 @@
+# Local toolchains and development runtimes
+/.tools/
+
+# Java and frontend build output
+target/
+node_modules/
+dist/
+*.tsbuildinfo
+.vite/
+.cache/
+.eslintcache
+
+# Test reports, coverage, and browser authentication state
+test-results/
+playwright-report/
+blob-report/
+coverage/
+.nyc_output/
+**/playwright/.auth/
+
+# Local environment configuration; keep documented examples
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+
+# Terraform working data, private inputs, and generated deployment outputs
+.terraform/
+*.tfstate*
+*.tfplan
+*.tfvars
+*.tfvars.json
+!*.example.tfvars
+!*.example.tfvars.json
+/infra/aws/outputs.json
+terraform-outputs.json
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# IDE and operating-system files
+.idea/
+*.iml
+.vscode/*.local.json
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Runtime logs and temporary editor files
+*.log
+*.pid
+*.pid.lock
+*.swp
+*.swo
+*~

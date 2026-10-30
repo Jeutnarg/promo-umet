@@ -1,0 +1,59 @@
+package dev.promo;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import dev.promo.store.Conflict;
+import dev.promo.store.DynamoStore;
+import dev.promo.store.Store;
+import java.net.URI;
+import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+
+@EnabledIfEnvironmentVariable(named = "DYNAMO_TEST_ENDPOINT", matches = ".+")
+class DynamoStoreTest {
+	@Test
+	void conditionalTransactionsAndPersistence() {
+		try (var client =
+				DynamoDbClient.builder()
+						.region(Region.US_EAST_1)
+						.endpointOverride(URI.create(System.getenv("DYNAMO_TEST_ENDPOINT")))
+						.credentialsProvider(
+								StaticCredentialsProvider.create(AwsBasicCredentials.create("local", "local")))
+						.build()) {
+			String table = "test-" + UUID.randomUUID();
+			var store = new DynamoStore(client, table, true);
+			try {
+				store.executeTransaction(
+						List.of(new Store.Write("owner", "cart", 0, "{\"version\":1}")), List.of());
+				assertThat(store.findDocument("owner", "cart").orElseThrow().version()).isEqualTo(1);
+				assertThat(store.findDocument("other", "cart")).isEmpty();
+				assertThatThrownBy(
+								() ->
+										store.executeTransaction(
+												List.of(
+														new Store.Write("owner", "order", 0, "{}"),
+														new Store.Write("owner", "cart", 0, "{}")),
+												List.of()))
+						.isInstanceOf(Conflict.class);
+				assertThat(store.findDocument("owner", "order")).isEmpty();
+				store.executeTransaction(
+						List.of(
+								new Store.Write("owner", "order", 0, "{}"),
+								new Store.Write("owner", "cart", 1, "{\"version\":2}")),
+						List.of());
+				var restarted = new DynamoStore(client, table, true);
+				assertThat(restarted.listDocuments("owner")).hasSize(2);
+				assertThat(restarted.findDocument("owner", "cart").orElseThrow().version()).isEqualTo(2);
+			} finally {
+				client.deleteTable(r -> r.tableName(table));
+			}
+		}
+	}
+}

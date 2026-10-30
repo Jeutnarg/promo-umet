@@ -1,0 +1,14 @@
+services:
+  dynamodb:
+    pull_policy: never
+  keycloak:
+    pull_policy: never
+  backend:
+    pull_policy: never
+  customer:
+    pull_policy: never
+  admin:
+    pull_policy: never
+networks:
+  local:
+    internal: true

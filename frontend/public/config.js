@@ -1,0 +1,1 @@
+window.__CONFIG__ = {app: "customer", api: "http://localhost:8081", authority: "http://localhost:8080/realms/sandbox", clientId: "sandbox-web", scope: "openid profile email", adminUrl: "http://localhost:3001", customerUrl: "http://localhost:3000"};

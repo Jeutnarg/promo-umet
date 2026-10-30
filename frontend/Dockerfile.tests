@@ -1,0 +1,6 @@
+FROM mcr.microsoft.com/playwright:v1.64.1-noble
+WORKDIR /workspace
+COPY package*.json ./
+RUN npm ci --no-audit --no-fund
+COPY . .
+CMD ["sh", "-c", "node tests/local-proxy.mjs & npm run test:e2e"]

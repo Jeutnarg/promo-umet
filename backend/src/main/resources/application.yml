@@ -1,0 +1,41 @@
+server:
+  port: 8081
+  error:
+    include-message: never
+spring:
+  application:
+    name: promotion-sandbox
+  profiles:
+    default: local
+  servlet:
+    multipart:
+      max-file-size: 256KB
+      max-request-size: 256KB
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+sandbox:
+  table: ${TABLE_NAME:promotion-sandbox}
+  region: ${AWS_REGION:us-east-1}
+  issuer: ${OIDC_ISSUER:http://localhost:8080/realms/sandbox}
+  jwks: ${OIDC_JWKS:http://localhost:8080/realms/sandbox/protocol/openid-connect/certs}
+  audience: ${OIDC_AUDIENCE:sandbox-api}
+  origins: ${CORS_ORIGINS:http://localhost:3000,http://localhost:3001}
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+sandbox:
+  endpoint: ${DYNAMO_ENDPOINT:http://localhost:8000}
+  initialize: true
+---
+spring:
+  config:
+    activate:
+      on-profile: aws
+sandbox:
+  endpoint: ""
+  initialize: false

@@ -99,6 +99,23 @@ public class DynamoStore implements Store {
 	}
 
 	@Override
+	public List<LegacyOrderDocument> scanLegacyOrders() {
+		var result = new ArrayList<LegacyOrderDocument>();
+		for (var page :
+				client.scanPaginator(request -> request.tableName(table).consistentRead(true))) {
+			for (var item : page.items()) {
+				String partition = item.get("pk").s();
+				if (partition.startsWith("user#") && partition.endsWith("#orders")) {
+					result.add(
+							new LegacyOrderDocument(
+									partition.substring(5, partition.length() - 7), deserializeStoredDocument(item)));
+				}
+			}
+		}
+		return result;
+	}
+
+	@Override
 	public void executeTransaction(List<Write> writes, List<Check> checks) {
 		var actions = new ArrayList<TransactWriteItem>();
 		for (var write : writes) {

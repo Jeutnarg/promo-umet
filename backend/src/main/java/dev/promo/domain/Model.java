@@ -178,6 +178,28 @@ public final class Model {
 			Instant createdAt) {}
 
 	/** Defines a deterministic pricing scenario and its expected results. */
+	/** Records the owner and immutable order snapshot for one purchased cart. */
+	public record Purchase(String owner, Order order) {}
+
+	/** Summarizes actual recorded discounts for one promotion across its versions. */
+	public record PromotionUsage(
+			String promotionId,
+			String name,
+			long purchaseCount,
+			long discountedUnits,
+			long cost,
+			long shippingCost,
+			Instant lastUsedAt) {}
+
+	/** Reports all-time promotion usage from recorded purchases rather than cart previews. */
+	public record PromotionDashboard(
+			long purchaseCount,
+			long totalPromotionCost,
+			long totalOrderValue,
+			List<PromotionUsage> promotions,
+			Instant generatedAt) {}
+
+	/** Defines a deterministic pricing scenario and its expected results. */
 	public record TestCase(
 			String name,
 			Cart cart,

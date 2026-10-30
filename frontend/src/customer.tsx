@@ -274,7 +274,7 @@ export function Customer() {
   }
   async function createFreshCart(clone: boolean) {
     const next = clone
-      ? await sendApiRequest<CartView>(`/carts/${order!.cart.id}/clone`, "POST")
+      ? await sendApiRequest<CartView>(`/orders/${order!.id}/clone`, "POST")
       : await client.createCart(createEmptyCart());
     applyCartView(next);
     setQuote(undefined);

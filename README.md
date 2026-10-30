@@ -94,6 +94,14 @@ npm audit --audit-level=moderate
 
 See [architecture and rule semantics](docs/architecture.md), [test evidence](docs/verification.md), and [AWS deployment](infra/aws/README.md).
 
+## Purchase records and promotion dashboard
+
+Each purchase permanently retains its items, quantities, promotion versions, discount allocations, shipping, total, and purchase time. Checkout atomically records it and deletes the source cart. A cart can be purchased only once, including concurrent submissions with different keys. Retrying the same completed submission returns its existing purchase. “Clone this cart” on the completion page creates a fresh cart from the purchase snapshot.
+
+Administrators can open **Promotion dashboard** to see all-time purchase counts, total promotion cost, order value, and per-promotion usage, discounted units, discount cost, shipping cost, and last-use time. Costs are actual recorded discounts in USD, including shipping savings. Editing a promotion cannot change past costs. Customer accounts cannot access the dashboard API.
+
+Existing orders are migrated into the purchase ledger once on startup, and their purchased carts are removed. Stop any older backend instance before starting this version; migration retains purchase history and does not require resetting local data.
+
 ## Limits
 
 Customer carts show item names and unit numbers rather than internal identifiers. Saved-cart labels show the server-calculated price followed by total quantity, newest save first. The save timestamp appears on hover, with `---` for older carts without timestamps. “Surprise me!” replaces the current contents with a random selection of 50–100% of catalog items and clears promotion selections. It uses 6–20 total units for catalogs smaller than eight items, or 2–3 times the catalog's unique-item count otherwise. Cart deletion requires confirmation and atomically creates an empty replacement.

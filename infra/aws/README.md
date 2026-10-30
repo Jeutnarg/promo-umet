@@ -34,6 +34,8 @@ Terraform stores infrastructure identifiers in state. Use a private, encrypted r
 
 ## Operations
 
+The purchase-ledger upgrade performs a one-time table scan to index existing owner order snapshots and remove purchased carts. The task role includes table-scoped `dynamodb:Scan` for this migration; normal dashboard reads use `Query`. For the first deployment of this upgrade, stop all older backend tasks before starting the updated service so legacy writers cannot create orders after migration. Keep the data table and volumes; no data reset is needed.
+
 Application logs go to CloudWatch with 30-day retention. Alarms cover sustained CPU use and target HTTP 5xx errors. Connect alarm actions to your notification destination when provisioning operational alerts. These resources define alarms but do not invent an email address or notification subscription.
 
 DynamoDB has point-in-time recovery and deletion protection enabled by default. To restore, restore to a new table, update `TABLE_NAME` through the infrastructure configuration, and verify ownership/order invariants before resuming traffic. S3 versioning preserves frontend versions. Keep immutable backend image tags for rollback, and redeploy the prior tag if necessary; restore matching frontend object versions and invalidate CloudFront caches.

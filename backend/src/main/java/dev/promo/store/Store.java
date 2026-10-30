@@ -11,9 +11,14 @@ public interface Store {
 
 	record Check(String partition, String id, long expectedVersion) {}
 
+	record LegacyOrderDocument(String owner, Document document) {}
+
 	Optional<Document> findDocument(String partition, String id);
 
 	List<Document> listDocuments(String partition);
+
+	/** Reads legacy owner-scoped orders only for the one-time purchase-ledger migration. */
+	List<LegacyOrderDocument> scanLegacyOrders();
 
 	void executeTransaction(List<Write> writes, List<Check> checks);
 }

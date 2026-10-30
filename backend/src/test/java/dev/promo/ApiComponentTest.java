@@ -180,7 +180,9 @@ class ApiComponentTest {
 		}
 		// Then exactly one order exists and cloning creates an editable cart.
 		assertThat(service.listOrders("alice")).hasSize(1);
-		mvc.perform(withAuthenticatedAdmin(post("/api/v1/carts/" + view.cart().id() + "/clone")))
+		mvc.perform(withAuthenticatedAdmin(get("/api/v1/carts/" + view.cart().id())))
+				.andExpect(status().isNotFound());
+		mvc.perform(withAuthenticatedAdmin(post("/api/v1/orders/" + key + "/clone")))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.cart.completed").value(false));
 	}
@@ -213,6 +215,8 @@ class ApiComponentTest {
 				"quote",
 				"submit",
 				"orders",
+				"order-clone",
+				"promotion-dashboard",
 				"promotions",
 				"promotion-save",
 				"testsets",
@@ -278,6 +282,17 @@ class ApiComponentTest {
 													Map.of(
 															"quoteId", service.createQuote("alice", view.cart().id(), 1).id())));
 					case "orders" -> get("/api/v1/orders");
+					case "order-clone" ->
+							post(
+									"/api/v1/orders/"
+											+ service
+													.submitOrder(
+															"alice",
+															service.createQuote("alice", view.cart().id(), 1).id(),
+															"cloned-purchase-key-123")
+													.id()
+											+ "/clone");
+					case "promotion-dashboard" -> get("/api/v1/admin/dashboard/promotions");
 					case "promotions" -> get("/api/v1/promotions");
 					case "promotion-save" ->
 							put("/api/v1/admin/promotions/" + id)

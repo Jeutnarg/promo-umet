@@ -58,6 +58,25 @@ public class MemoryStore implements Store {
 	}
 
 	@Override
+	public synchronized List<LegacyOrderDocument> scanLegacyOrders() {
+		recordAccess();
+		return documents.entrySet().stream()
+				.filter(
+						entry ->
+								entry.getKey().startsWith("user#")
+										&& entry
+												.getKey()
+												.substring(0, entry.getKey().lastIndexOf('|'))
+												.endsWith("#orders"))
+				.map(
+						entry ->
+								new LegacyOrderDocument(
+										entry.getKey().substring(5, entry.getKey().lastIndexOf('|') - 7),
+										entry.getValue()))
+				.toList();
+	}
+
+	@Override
 	public synchronized void executeTransaction(List<Write> writes, List<Check> checks) {
 		recordAccess();
 		for (var write : writes) {

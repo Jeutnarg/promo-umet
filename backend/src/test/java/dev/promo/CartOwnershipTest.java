@@ -43,6 +43,23 @@ class CartOwnershipTest {
 		assertThat(summaries.getFirst().totalQuantity()).isEqualTo(3);
 		var latest =
 				service.createCart("alice", createCart(List.of(createLine("newest-item", 1, 100))));
+		var olderSnapshot =
+				new Cart(
+						original.cart().id(),
+						2,
+						original.cart().lines(),
+						original.cart().shipping(),
+						original.cart().selections(),
+						false,
+						latest.cart().savedAt().minusSeconds(1));
+		documents.executeTransaction(
+				List.of(
+						new dev.promo.store.Store.Write(
+								"user#alice#carts",
+								original.cart().id(),
+								1,
+								mapper.writeValueAsString(olderSnapshot))),
+				List.of());
 		assertThat(service.listCartSummaries("alice"))
 				.extracting(SandboxService.CartSummary::id)
 				.containsExactly(latest.cart().id(), original.cart().id());

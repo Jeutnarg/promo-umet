@@ -84,6 +84,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orders/{id}/clone": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["clonePurchasedCart"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/carts": {
         parameters: {
             query?: never;
@@ -236,6 +252,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["listTestSets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/dashboard/promotions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getPromotionDashboard"];
         put?: never;
         post?: never;
         delete?: never;
@@ -459,6 +491,31 @@ export interface components {
             savedAt?: string;
             completed: boolean;
         };
+        PromotionDashboard: {
+            /** Format: int64 */
+            purchaseCount: number;
+            /** Format: int64 */
+            totalPromotionCost: number;
+            /** Format: int64 */
+            totalOrderValue: number;
+            promotions: components["schemas"]["PromotionUsage"][];
+            /** Format: date-time */
+            generatedAt: string;
+        };
+        PromotionUsage: {
+            promotionId: string;
+            name: string;
+            /** Format: int64 */
+            purchaseCount: number;
+            /** Format: int64 */
+            discountedUnits: number;
+            /** Format: int64 */
+            cost: number;
+            /** Format: int64 */
+            shippingCost: number;
+            /** Format: date-time */
+            lastUsedAt?: string;
+        };
         Audit: {
             actor: string;
             action: string;
@@ -669,6 +726,28 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["Order"];
+                };
+            };
+        };
+    };
+    clonePurchasedCart: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CartView"];
                 };
             };
         };
@@ -913,6 +992,26 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["TestSet"][];
+                };
+            };
+        };
+    };
+    getPromotionDashboard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PromotionDashboard"];
                 };
             };
         };

@@ -223,7 +223,7 @@ resource "aws_iam_role" "task" {
 }
 resource "aws_iam_role_policy" "data" {
   role   = aws_iam_role.task.id
-  policy = jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Action = ["dynamodb:GetItem", "dynamodb:Query", "dynamodb:PutItem", "dynamodb:DeleteItem", "dynamodb:ConditionCheckItem"], Resource = aws_dynamodb_table.data.arn }] })
+  policy = jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Action = ["dynamodb:GetItem", "dynamodb:Query", "dynamodb:Scan", "dynamodb:PutItem", "dynamodb:DeleteItem", "dynamodb:ConditionCheckItem"], Resource = aws_dynamodb_table.data.arn }] })
 }
 resource "aws_ecs_cluster" "main" { name = var.project }
 resource "aws_ecs_task_definition" "backend" {

@@ -15,6 +15,7 @@ public class ApiSchema {
 				Map.of(
 						"Cart", Set.of("savedAt"),
 						"CartSummary", Set.of("savedAt"),
+						"PromotionUsage", Set.of("lastUsedAt"),
 						"Promotion", Set.of("expiresAt", "description"),
 						"Selection", Set.of("lineId", "pairs"),
 						"Details", Set.of("amount", "basisPoints", "threshold", "categories"),

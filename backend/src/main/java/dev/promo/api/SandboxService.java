@@ -9,11 +9,14 @@ import dev.promo.domain.Model.Item;
 import dev.promo.domain.Model.OptimizationResult;
 import dev.promo.domain.Model.Order;
 import dev.promo.domain.Model.Promotion;
+import dev.promo.domain.Model.PromotionDashboard;
+import dev.promo.domain.Model.Purchase;
 import dev.promo.domain.Model.Quote;
 import dev.promo.domain.Model.TestResult;
 import dev.promo.domain.Model.TestSet;
 import dev.promo.domain.Optimizer;
 import dev.promo.domain.PricingEngine;
+import dev.promo.domain.PromotionAnalytics;
 import dev.promo.domain.Rules;
 import dev.promo.store.Conflict;
 import dev.promo.store.Store;
@@ -89,7 +92,9 @@ public class SandboxService {
 	}
 
 	public List<Cart> listCarts(String owner) {
-		return listDocuments(buildOwnerPartition(owner, "carts"), Cart.class);
+		return listDocuments(buildOwnerPartition(owner, "carts"), Cart.class).stream()
+				.filter(cart -> !cart.completed())
+				.toList();
 	}
 
 	public List<CartSummary> listCartSummaries(String owner) {
@@ -222,6 +227,9 @@ public class SandboxService {
 			return getMatchingOrder(existing.get(), quoteId);
 		}
 		var quote = getRequiredDocument(buildOwnerPartition(owner, "quotes"), quoteId, Quote.class);
+		if (store.findDocument("purchases", quote.cart().id()).isPresent()) {
+			throw new Conflict("This cart has already been purchased");
+		}
 		if (!clock.instant().isBefore(quote.expiresAt())) {
 			throw new Conflict("Quote expired; confirm again");
 		}
@@ -237,15 +245,13 @@ public class SandboxService {
 			throw new Conflict("Pricing changed; confirm again");
 		}
 		var order = new Order(key, quoteId, cart, catalog.promotions(), evaluation, clock.instant());
-		var completed =
-				new Cart(
-						cart.id(), cart.version() + 1, cart.lines(), cart.shipping(), cart.selections(), true);
 		try {
 			store.executeTransaction(
 					List.of(
 							createDocumentWrite(buildOwnerPartition(owner, "orders"), key, 0, order),
-							createDocumentWrite(
-									buildOwnerPartition(owner, "carts"), cart.id(), cart.version(), completed)),
+							createDocumentWrite("purchases", cart.id(), 0, new Purchase(owner, order)),
+							new Store.Write(
+									buildOwnerPartition(owner, "carts"), cart.id(), cart.version(), null)),
 					List.of(createCatalogVersionCheck(catalog)));
 		} catch (Conflict conflict) {
 			var retry = store.findDocument(buildOwnerPartition(owner, "orders"), key);
@@ -255,6 +261,72 @@ public class SandboxService {
 			throw conflict;
 		}
 		return order;
+	}
+
+	public CartView clonePurchasedCart(String owner, String orderId) {
+		var order = getRequiredDocument(buildOwnerPartition(owner, "orders"), orderId, Order.class);
+		var snapshot = order.cart();
+		return createCart(
+				owner,
+				new Cart(null, 0, snapshot.lines(), snapshot.shipping(), snapshot.selections(), false));
+	}
+
+	public PromotionDashboard getPromotionDashboard() {
+		return new PromotionAnalytics()
+				.createDashboard(
+						listDocuments("purchases", Purchase.class), listPromotions(), clock.instant());
+	}
+
+	public void migrateLegacyPurchases() {
+		for (int attempt = 0; attempt < 5; attempt++) {
+			if (store.findDocument("migrations", "purchase-ledger-v1").isPresent()) {
+				return;
+			}
+			try {
+				for (var legacy : store.scanLegacyOrders()) {
+					migrateLegacyPurchase(legacy);
+				}
+				store.executeTransaction(
+						List.of(
+								createDocumentWrite(
+										"migrations", "purchase-ledger-v1", 0, Map.of("completedAt", clock.instant()))),
+						List.of());
+				return;
+			} catch (Conflict concurrentMigration) {
+				if (attempt == 4) {
+					throw concurrentMigration;
+				}
+			}
+		}
+	}
+
+	private void migrateLegacyPurchase(Store.LegacyOrderDocument legacy) {
+		var order = deserializeDocument(legacy.document(), Order.class);
+		var existing = store.findDocument("purchases", order.cart().id());
+		if (existing.isPresent()) {
+			var purchase = deserializeDocument(existing.get(), Purchase.class);
+			if (!purchase.owner().equals(legacy.owner()) || !purchase.order().id().equals(order.id())) {
+				throw new IllegalStateException("Multiple legacy purchases exist for a cart");
+			}
+		} else {
+			store.executeTransaction(
+					List.of(
+							createDocumentWrite(
+									"purchases", order.cart().id(), 0, new Purchase(legacy.owner(), order))),
+					List.of());
+		}
+		var completedCart =
+				store.findDocument(buildOwnerPartition(legacy.owner(), "carts"), order.cart().id());
+		if (completedCart.isPresent()) {
+			store.executeTransaction(
+					List.of(
+							new Store.Write(
+									buildOwnerPartition(legacy.owner(), "carts"),
+									order.cart().id(),
+									completedCart.get().version(),
+									null)),
+					List.of());
+		}
 	}
 
 	private Order getMatchingOrder(Store.Document document, String quoteId) {

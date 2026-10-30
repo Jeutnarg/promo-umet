@@ -798,3 +798,53 @@ fieldset:disabled textarea {
 .surprise-cart {
   display: block;
 }
+.dashboard-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+}
+.dashboard-metrics strong {
+  display: block;
+  font-size: 32px;
+  margin-top: 18px;
+  font-variant-numeric: tabular-nums;
+}
+.dashboard-table-wrap {
+  overflow-x: auto;
+}
+.dashboard-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  text-align: left;
+}
+.dashboard-table caption {
+  text-align: left;
+  color: var(--muted);
+  padding: 0 0 20px;
+  line-height: 1.6;
+}
+.dashboard-table th,
+.dashboard-table td {
+  padding: 15px 12px;
+  border-bottom: 1px solid var(--line);
+  font-variant-numeric: tabular-nums;
+  vertical-align: top;
+}
+.dashboard-table thead {
+  background: #f4f5f0;
+}
+.dashboard-table td:not(:last-child) {
+  white-space: nowrap;
+}
+@media (max-width: 680px) {
+  .dashboard-metrics {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .promotion-dashboard > .section-heading {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+}

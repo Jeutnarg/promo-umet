@@ -14,10 +14,10 @@ const java = process.env.JAVA_HOME ? resolve(process.env.JAVA_HOME, 'bin', proce
 let differences = false;
 for (const file of await findJavaFiles('backend/src')) {
   const original = await readFile(file, 'utf8');
-  const normalized = original.replace(/^\t+/gm, tabs => '  '.repeat(tabs.length));
+  const normalized = original.replace(/\r\n/g, '\n').replace(/^\t+/gm, tabs => '  '.repeat(tabs.length));
   const result = spawnSync(java, ['-jar', formatterJar, '-'], { input: normalized, encoding: 'utf8' });
   if (result.status !== 0) throw new Error(result.stderr || `Formatting failed: ${file}`);
-  const formatted = result.stdout.replace(/^(?: {2})+/gm, spaces => '\t'.repeat(spaces.length / 2));
+  const formatted = result.stdout.replace(/\r\n/g, '\n').replace(/^(?: {2})+/gm, spaces => '\t'.repeat(spaces.length / 2));
   if (original.replace(/\r\n/g, '\n') !== formatted) {
     differences = true;
     if (checkOnly) console.error(`Formatting differs: ${file}`);

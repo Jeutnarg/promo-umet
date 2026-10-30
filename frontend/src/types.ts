@@ -15,3 +15,4 @@ export type TestCase = components["schemas"]["TestCase"];
 export type TestResult = components["schemas"]["TestResult"];
 
 export type CartSummary = components["schemas"]["CartSummary"];
+export type PromotionDashboard = components["schemas"]["PromotionDashboard"];

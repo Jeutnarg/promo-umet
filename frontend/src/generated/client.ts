@@ -10,6 +10,7 @@ export function createClient(transport: Transport) { return {
   "savePromotion": (path: operations["savePromotion"]['parameters']['path'], body: NonNullable<operations["savePromotion"]['requestBody']>['content']['application/json']) => transport<operations["savePromotion"]['responses'][200]['content']["*/*"]>("/admin/promotions/{id}".replace("{id}", encodeURIComponent(String(path["id"]))), "PUT", body, undefined),
   "listOrders": () => transport<operations["listOrders"]['responses'][200]['content']["*/*"]>("/orders", "GET", undefined, undefined),
   "submitOrder": (body: NonNullable<operations["submitOrder"]['requestBody']>['content']['application/json'], headers: NonNullable<operations["submitOrder"]['parameters']['header']>) => transport<operations["submitOrder"]['responses'][200]['content']["*/*"]>("/orders", "POST", body, headers),
+  "clonePurchasedCart": (path: operations["clonePurchasedCart"]['parameters']['path']) => transport<operations["clonePurchasedCart"]['responses'][200]['content']["*/*"]>("/orders/{id}/clone".replace("{id}", encodeURIComponent(String(path["id"]))), "POST", undefined, undefined),
   "listCarts": () => transport<operations["listCarts"]['responses'][200]['content']["*/*"]>("/carts", "GET", undefined, undefined),
   "createCart": (body: NonNullable<operations["createCart"]['requestBody']>['content']['application/json']) => transport<operations["createCart"]['responses'][200]['content']["*/*"]>("/carts", "POST", body, undefined),
   "createQuote": (path: operations["createQuote"]['parameters']['path'], body: NonNullable<operations["createQuote"]['requestBody']>['content']['application/json']) => transport<operations["createQuote"]['responses'][200]['content']["*/*"]>("/carts/{id}/quotes".replace("{id}", encodeURIComponent(String(path["id"]))), "POST", body, undefined),
@@ -21,5 +22,6 @@ export function createClient(transport: Transport) { return {
   "listItems": () => transport<operations["listItems"]['responses'][200]['content']["*/*"]>("/items", "GET", undefined, undefined),
   "listCartSummaries": () => transport<operations["listCartSummaries"]['responses'][200]['content']["*/*"]>("/carts/summaries", "GET", undefined, undefined),
   "listTestSets": () => transport<operations["listTestSets"]['responses'][200]['content']["*/*"]>("/admin/testsets", "GET", undefined, undefined),
+  "getPromotionDashboard": () => transport<operations["getPromotionDashboard"]['responses'][200]['content']["*/*"]>("/admin/dashboard/promotions", "GET", undefined, undefined),
   "listAuditEvents": () => transport<operations["listAuditEvents"]['responses'][200]['content']["*/*"]>("/admin/audit", "GET", undefined, undefined),
 }; }

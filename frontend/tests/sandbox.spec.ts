@@ -155,7 +155,32 @@ test("sketch checkout, return, submit, clone and fresh cart", async ({
   await page.getByRole("button", { name: "Checkout" }).click();
   await page.getByRole("button", { name: "Let me think" }).click();
   await page.getByRole("button", { name: "Checkout" }).click();
+  const purchaseResponse = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/v1/orders") &&
+      response.request().method() === "POST" &&
+      response.status() === 200,
+  );
   await page.getByRole("button", { name: "Buy Buy Buy" }).click();
+  const submitted = await purchaseResponse;
+  const purchase = await submitted.json();
+  const authorization = submitted.request().headers()["authorization"];
+  expect(
+    (
+      await page.request.get(
+        `http://localhost:8081/api/v1/carts/${purchase.cart.id}`,
+        { headers: { authorization } },
+      )
+    ).status(),
+  ).toBe(404);
+  expect(
+    (
+      await page.request.post("http://localhost:8081/api/v1/orders", {
+        headers: { authorization, "Idempotency-Key": crypto.randomUUID() },
+        data: { quoteId: purchase.quoteId },
+      })
+    ).status(),
+  ).toBe(409);
   await expect(page.getByText("SIMULATED ORDER RECORDED")).toBeVisible();
   await page.getByRole("button", { name: "Clone this cart" }).click();
   await expect(page.locator(".grand-total")).toHaveText("Total$54.00");
@@ -248,6 +273,105 @@ test("customer cannot open administrator functionality", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Administrator access required" }),
   ).toBeVisible();
+});
+
+test("administrator dashboard counts purchases once and preserves actual promotion costs", async ({
+  page,
+  context,
+}) => {
+  let authorization = "";
+  page.on("request", (request) => {
+    if (request.url().includes("/api/v1/"))
+      authorization = request.headers()["authorization"] || authorization;
+  });
+  await signInToWorkspace(page, "admin", "admin");
+  await expect(page.getByRole("button", { name: /BogoBongo/ })).toBeVisible();
+  await page
+    .getByRole("button", { name: "Promotion dashboard", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Promotion usage & cost" }),
+  ).toBeVisible();
+  const baseline = await (
+    await context.request.get(
+      "http://localhost:8081/api/v1/admin/dashboard/promotions",
+      { headers: { authorization } },
+    )
+  ).json();
+  const created = await context.request.post(
+    "http://localhost:8081/api/v1/carts",
+    {
+      headers: { authorization },
+      data: {
+        id: "ignored",
+        version: 0,
+        lines: [
+          {
+            id: "dashboard-tote",
+            itemId: "sample-one",
+            name: "Dashboard tote",
+            quantity: 2,
+            price: 1000,
+            category: "Accessories",
+          },
+        ],
+        shipping: 1000,
+        selections: [
+          { promotionId: "bogobongo", lineId: "dashboard-tote", pairs: [] },
+        ],
+        completed: false,
+      },
+    },
+  );
+  expect(created.ok()).toBeTruthy();
+  const view = await created.json();
+  const quoted = await context.request.post(
+    `http://localhost:8081/api/v1/carts/${view.cart.id}/quotes`,
+    { headers: { authorization }, data: { version: view.cart.version } },
+  );
+  expect(quoted.ok()).toBeTruthy();
+  const quote = await quoted.json();
+  const key = crypto.randomUUID();
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const purchased = await context.request.post(
+      "http://localhost:8081/api/v1/orders",
+      {
+        headers: { authorization, "Idempotency-Key": key },
+        data: { quoteId: quote.id },
+      },
+    );
+    expect(purchased.ok()).toBeTruthy();
+  }
+  await page
+    .getByRole("button", { name: "Refresh dashboard", exact: true })
+    .click();
+  await expect(page.getByTestId("purchase-count")).toHaveText(
+    (baseline.purchaseCount + 1).toLocaleString(),
+  );
+  await expect(page.getByTestId("promotion-cost")).toHaveText(
+    new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+    }).format((baseline.totalPromotionCost + 1000) / 100),
+  );
+  const report = await (
+    await context.request.get(
+      "http://localhost:8081/api/v1/admin/dashboard/promotions",
+      { headers: { authorization } },
+    )
+  ).json();
+  const previous = baseline.promotions.find(
+    (usage: { promotionId: string }) => usage.promotionId === "bogobongo",
+  );
+  const current = report.promotions.find(
+    (usage: { promotionId: string }) => usage.promotionId === "bogobongo",
+  );
+  expect(current.purchaseCount).toBe(previous.purchaseCount + 1);
+  expect(current.cost).toBe(previous.cost + 1000);
+  await page.screenshot({
+    path: "test-results/promotion-dashboard.png",
+    fullPage: true,
+  });
 });
 test("login and logout need no external network", async ({ page }) => {
   await signInToWorkspace(page);

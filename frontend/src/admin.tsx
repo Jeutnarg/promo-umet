@@ -8,6 +8,7 @@ import {
 } from "./api";
 import { generatePromotionDescription } from "./promotion-description";
 import { Trace } from "./components";
+import { PromotionDashboard } from "./promotion-dashboard";
 import type { Promotion, TestCase, TestResult, TestSet } from "./types";
 
 function createPromotionDraft(): Promotion {
@@ -181,6 +182,12 @@ export function Admin() {
       </div>
       <div className="tabs">
         <button
+          className={tab === "dashboard" ? "selected" : ""}
+          onClick={() => setTab("dashboard")}
+        >
+          Promotion dashboard
+        </button>
+        <button
           className={tab === "promotions" ? "selected" : ""}
           onClick={() => setTab("promotions")}
         >
@@ -211,7 +218,9 @@ export function Admin() {
         </div>
       )}
       <fieldset disabled={busy} className="workspace-fieldset">
-        {tab === "promotions" ? (
+        {tab === "dashboard" ? (
+          <PromotionDashboard />
+        ) : tab === "promotions" ? (
           <div className="admin-layout">
             <section className="panel">
               <div className="section-heading">

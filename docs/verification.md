@@ -1,5 +1,7 @@
 # Verification record
 
+Purchase lifecycle and analytics: **114 backend tests and 16 browser scenarios pass**. Tests cover atomic purchase snapshots and cart removal, different quotes/keys, simultaneous submissions, transaction rollback, idempotent retries, clone-from-purchase ownership, legacy migration, actual DynamoDB persistence after service recreation, administrator authorization, and promotion cost aggregation including shipping. Browser checks verify the purchased cart is gone, another purchase is rejected, and dashboard totals increase exactly once. Existing purchase history is backfilled at application startup.
+
 Latest cart-display changes: **101 backend tests and 15 browser scenarios pass**. Saved-cart summaries are owner-scoped and calculated by the server; tests verify prices, quantities, newest-first ordering, hover timestamps, aligned two-column filters, and banner clearing on manual edits.
 
 Optimizer performance checks now exercise Suggest and Swindle with 500 and 1,000 merchandise units and the supported maximum of 50 promotions. Four runs completed in approximately 2.00–2.02 seconds each, returned reproducible valid prices, and correctly reported unproven optimality. Tests also cover BOGO after an earlier discount reverses relative item prices, including zero, equality, and either pairing orientation.

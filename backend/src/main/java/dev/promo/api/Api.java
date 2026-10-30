@@ -8,6 +8,7 @@ import dev.promo.domain.Model.Audit;
 import dev.promo.domain.Model.Cart;
 import dev.promo.domain.Model.Order;
 import dev.promo.domain.Model.Promotion;
+import dev.promo.domain.Model.PromotionDashboard;
 import dev.promo.domain.Model.Quote;
 import dev.promo.domain.Model.TestResult;
 import dev.promo.domain.Model.TestSet;
@@ -127,6 +128,16 @@ public class Api {
 	@GetMapping("/orders")
 	public List<Order> listOrders(@AuthenticationPrincipal Jwt jwt) {
 		return service.listOrders(jwt.getSubject());
+	}
+
+	@PostMapping("/orders/{id}/clone")
+	public CartView clonePurchasedCart(@AuthenticationPrincipal Jwt jwt, @PathVariable String id) {
+		return service.clonePurchasedCart(jwt.getSubject(), id);
+	}
+
+	@GetMapping("/admin/dashboard/promotions")
+	public PromotionDashboard getPromotionDashboard() {
+		return service.getPromotionDashboard();
 	}
 
 	@GetMapping("/promotions")

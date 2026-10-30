@@ -1,0 +1,276 @@
+Solovis
+	TIME
+		4:30 - 5:30 PM: read the brief, research, write most of prompt
+		7:30 - 7:50 PM: sketch layout, finish prompt, kick off plan mode
+		8:00 - 8:10 PM: work through plan mode and kick it off
+		8:40 - 8:45 PM: initial look. Wife actually thought it was a real website, lol. She asked "Why are they charging you $94 to apply?" - $94 was the total displayed
+		10:25-10:40 PM: first wave of tweaks and fixes based purely on interacting with the app locally
+		10:40-10:50 PM: review code while executing tweak first pass prompt
+		10:50-11:10 PM: more edit while reviewing cycles - can keep it continuous if you rotate between disparate segments
+		11:10-midnight:	preparing final elements, writing up retro questions, maintainability prompt, documentation prompt
+		7:00 - 7:15 AM: sanity-check, manual review
+		7:15 - 7:25 AM: writeup DECISIONS.md
+		7:25 - 7:50 AM: streamline local dev outside of AI-managed docker locally, lot of waiting plus managing breakfast for children
+		8:00 - 8:10 AM: package things up
+	
+	NOTES (stream of consciousness, really) ON REQS
+		strong preference for thought process, maintainability
+		artifacts
+				application itself
+			DECISIONS.md
+				~2 page doc highlighting key architectural choices and decisioning as well as any alternate approaches and scope alterations
+			README.md
+				must have a line at the very top of the file saying "reqs not read"
+		ideally keep history of prompts, agent transcripts
+		track time somewhat
+		care 
+		test coverage, quality, strategy, utility
+		code quality and its enforcement
+		strong preference for evidence (ideally runnable elsewhere) for claims
+		Stretch goals
+		global stretch goal
+			whole thing runs on cloud with IAC
+			genuinely optional
+		Grading Rubric
+			architecture and boundaries
+			long-term maintainability
+			testing
+			usage of tools (how)
+			correctness + robustness
+			development process
+			scope and judgment
+			handling the genuinely hard part
+				there's a doozy somewhere in the brief
+			code quality
+			decisions and their defense
+
+	BRIEF SELECTOIN
+		#2 entitlements service
+		#5 pricing rules engine looks fun
+			quite frankly, I like the idea of doing the stretch goal plus doing a "demon" mode which does the exact opposite (think Temu)
+				demon mode renamed to Swindle because it paired better with Suggest
+
+	Given cart of item, quantity, and price + set of promotions, compute an itemized final price
+	
+	Support a wide variety of promotion types, make it easy to add a new type
+	
+	Keep the promotion combinations transparent, deterministic
+		Make it visual
+	
+	No invalid results
+	
+	clean usable UI to build a cart and toggle active promotions
+	
+	Stretch = calculate "best" outcome
+		needs to be efficient
+	
+	Want a brutal/thorough test suite
+
+	Types of grouping
+		none (global application), loose (can overlap but only some), conditionally exclusive, exclusive
+	Types of 
+		
+	DECISION
+		We cannot trust the user, so the server must run the rules. Nonetheless, the rules should be provided to the FE for faster local calculations in the cart phase.
+			Need confirmation page where the values all come from the backend.
+	
+	QUESTION
+		what to do if promotions change after a user reaches the confirmation page
+			first pass = confirmation page has a timeout and promotion changes have a rollout window?
+				second pass = ability to use rollout window or immediate effect?
+	
+	RESEARCH
+		I like this library - https://github.com/j-easy/easy-rules
+			seems similar in ways to JDBI, which I like
+		what about Drools
+			not a fan of the format, prefer fluent
+	
+	QUESTION
+		how much of the business logic to put on the MFE for speed of use?
+			how to refresh?
+		DECISION
+			let's not. You could later, but it makes maintainence a royal PITA to support multiple rules engines even if they're the same language (tight coupling is still tight coupling.)
+	
+	FIRST PROMPT
+		DIRECTION
+		You are an architect working with a senior engineer. You may challenge design decisions but not the domain or goals. Everything must work locally but also be easily transitioned to cloud hosting. If feasible, include infrastructure as code for the full system, assuming AWS where an assumption must be made.
+		
+		GUIDING PRINCIPLES
+			We care about stable and scalable architecture and maintainability above all. Code must be well-structured, with repetitive code in both tests and main extracted. Comments should be terse and not normally present within a method.
+	
+		OVERVIEW
+		We are creating a four-part system. The first part is a simple database (probably NoSQL) resource which acts as the source of truth. The second is a web service which holds core logic, acts as a judge of correctness, and supports the frontends. The third is a thin frontend which serves users. The fourth is a thin frontend which serves administrators. There is a fifth, implicit service for authorization/authentication. This overall system could be prepared for deployment soon, and so security must be incorporated from initiation.
+		
+		For now, let us assume...
+			That our final product uses a cloud-based NoSQL service such as Redis or DynamoDB for the resource component. The final product will use an Amazon-hosted Java SpringBoot service as the backend component. The final product will use a Typescript framework for both frontends. The final product will use OAuth for authorization/authentication, but this assumption is weak.
+		
+		
+		THE DOMAIN
+		We are creating a system to allow users to load a cart with items of particular quantity and price as well as apply promotions in a variety of types. Promotions are applied to the cart as selected. A final price is calculated and displayed to the user as they move through the process. The user has the cart/order page, the confirmation page, and the order complete page, which has an option to navigate to a fresh cart page or a cloned cart page to repeat an order. An admin has the promotions control page and the promotion test page. The promotion test page allows for the construction of test sets based on files or copy-pasted in as well as manual entry (which can then be saved to a file and incorporated into a new or existing test set.) At any phase in either testing by admin or usage by user, the promotion logic must be transparent; the users must know which promotions applied and how much money they saved. There should be a "Suggest" function which calculates the optimal promotion application strategy and a "Swindle" option which displays the least-optimal promotion application strategy which still applies at least one to every item if possible. Promotions have expirations, and an expired promotion should be removed with a small banner notification. When displaying multiple promotions on a single item, order by largest savings descending.
+		
+		POTENTIAL CONFLICTS
+			The suggested rules library may not have the flexibility to do what we need. Feel free to pivot from that.
+		
+		TESTING PRINCIPLES
+			UNIT TESTS
+				Unit tests for a method use parameterized inputs to test edge cases and several interior cases.
+				Unit tests for a method which calls another method test that the method is called when the condition for calling it is true (may be implicitly true always if not conditional).
+				Unit tests for a method which calls another method test that the method is called with the correct parameters.
+				Unit tests for a method which calls another method test that the method's response is correctly passed to the next stage.
+				Unit tests for a method which calls another method do not test internal behavior.
+				Unit tests use terse comments to describe their purpose.
+			COMPONENT TESTS
+				Tests validate every exposed endpoint's full set of flows. A flow is defined as a unique ordering of downstream resource accesses, meaning that a GET call which can either call the database once or twice has four flows. Flow 1 - FAILURE. Flow 2 - SUCCESS. Flow 3 - SUCCESS FAILURE. Flow 4 - SUCCESS SUCCESS. The tests should use the @SpringBootTest approach, use Java code to generate mock files in a fluent format, have Gherkin comments, and set unique data for every endpoint in order to prove that each endpoint was reached as expected.
+		
+		MODELS
+			Item - name, quantity, price, category
+			Carts - user, list of items
+			User - name, login details, list of carts, isAdmin
+			Promotion - name, scope, exclusivity, strategy, strategy details (key-value), expiration
+			
+		PROMOTION STRATEGY EXAMPLES
+			bogo - buy one get one of equal or lesser value free
+			flat - reduces price by constant
+			flatgoal - reduces price by constant if total after promotions (not including itself) exceeds constant.
+			shippinggoal - reduces price by cost of shipping if total after promotions (not including itself) exceeds constant
+			rainbowpercent - reduces price by percentage if number of categories equals or exceeds constant
+		
+		PROMOTION SCOPE EXAMPLES
+			oneitem - only applies to one item
+			item - applies to all of one item
+			items - applies to entire order except shipping
+			order - applies to entire order
+		
+		SPECIFICS
+			Use https://www.w3schools.com/w3css/tryit.asp?filename=tryw3css_templates_hotel&stacked=h as a template for fonts, color, padding, etc. Use the attached image for layout.
+			Use https://github.com/j-easy/easy-rules for the core rule engine definitions if possible.
+	-- end of the first prompt
+	
+	DECISION
+		use more advanced model for initial wave, since work may be split over usage refresh
+
+	DECISION (planning)
+		assume sandbox for now. No way is actual inventory management in-scope here
+		Deterministic but sequential pricing. Narrower scope goes before broader. Flat reductions go before % go before fixed-price.
+		goal promotions trigger after all non-goal promotions and do not consider each other for value other than a global minimum
+		exclusive = stackable, unit, global
+		suggest should timebox and highlight if it isn't positive
+		BOGO should pair, then flatten
+		Swindle tries to put as many discounts on the screen as possible while reducing the actual savings
+		order scope by default ignores shipping
+	PLAN
+		adjust to make requirement that everything runs locally without any external accounts
+
+	FIRST PASS
+		TWEAK display fun message when no items are selected "Won't your empty box be oh so pretty!"
+		TWEAK display total items next to "In your cart" like "In your cart (X)"
+		FIX For anything displayed on the webpage to regular customers, do NOT display random UUID nonsense. Just display the item name and number.
+		FIX We need clearer messaging about scope and style for the customer. Don't just display the exact enum or value. Make it a sentence - suggest one in the promotion creation page and then let the description be saved/edited later. Same goes for "Saved carts" Just display a timestamp of the save, no random UUID nonsense.
+		TWEAK Change Suggest message to "Optimal promotions found! What an artful deal!"
+		TWEAK Change Swindle banner to "Apparently optimal promotions applied! What an awful deal!"
+		TWEAK What does the "First eligible line" option on a promotion do, and should it say "Remove"
+		TWEAK Add a label underneath the "+" button that says "Surprise me!" and which generates a random cart of items of somewhere between 50% to 100% of the total number of unique items and between 6-20 total items or, if there are at least 8 unique items in the catalog, between 2x and 3x the number of unique items but randomized.
+		TWEAK Add an X underneath the Green "YOUR CART" button which, after confirmation, deletes the current cart. The user should then have an empty cart.
+		
+		TWEAK Admin should default expiration to one month from today. Saving one in the past is allowed, but the promotion is immediately unavailable.
+		TWEAK The Promotions list should have a checkbox to only display promotions without an expiration and a checkbox to display expired promotions and a checkbox to only display disabled and a checkbox to not display disabled. It's a radio group, so we should also have an option to display all.
+		TWEAK An expired promotion should have all the normal edit boxes greyed out except the expiration field, which should be at the top instead of near the bottom. There should also be an "Expired" label in parenthesis after "Edit promotion"
+		TWEAK Switching to a different test set should clear the "Run tests" "Test run complete" banner. That banner should also have an X to clear it.
+		TWEAK The Run Tests button should have a red error text to the right (and small) saying "No test cases" if you click the button when there are no test cases.
+
+	REVIEW
+		Looking at the code base
+			oh my god, this is so ugly (purely style-wise)
+	
+	SECOND PASS
+		STYLE FIX all the java code needs to adhere to the Google Java style guide standards, and be tab-indented
+		FIX the evaluate method is way too long. Break it up appropriately
+		STYLE FIX method names throughout the project are way too terse. Be a little more verbose. Use some verbs
+		CYBER Check for IDOR on the Api.java class. Can a user edit somebody else's cart? They shouldn't be able to.
+		
+	QUESTION
+		are we responsive?
+			used dev tools... looks responsive
+	
+	THIRD PASS
+		STYLE the radio group should all be aligned and we can put two on a line
+		TEST BOGO should not allow you to get an item B for free if it's originally worth less than item A BUT A is being reduced by a promotion to a price lower than B
+		TWEAK the message for when a cart has no timestamp should be "---", not "Saved before timestamps were available"
+		TWEAK add text above the "Swindle covers as many ..." message to say "Suggest best" finds you a great deal and tries to find the absolute best!
+		TEST let's add a performance test on Suggest best and Swindle for huge test set sizes with many, many promotions.
+		TWEAK update the "Suggest best" banner text for optimal to be "Optimal promotions found! What an artful deal! X units discounted." Don't mention optimal twice or coverage. Swindle banner should be "Apparently optimal promotions applied! What an awful deal! X units discounted" Don't mention optimal twice or coverage.
+		TWEAK editing the cart manually or by clicking the suggestion or swindle button should clear the banner.
+		TWEAK the saved carts list should say the price, then the total number of items, and show the timestamp on hover. The saved carts should be ordered by timestamp.
+	
+	REVIEW
+		oh thank god. It's not ugly anymore.
+	
+	FOURTH PASS
+		Update the .gitignore file(s)
+	
+	FIFTH PASS (while reviewing docs)
+		Save records of each purchase, and make sure that a cart which is purchased is removed and can't be purchased again - only one purchase per cart.
+		Create an admin-only dashboard which shows usage of each promotion and how much it has cost.
+	
+	DOC REVIEW
+		Spring Boot - reasonable choice. No compelling reason to switch to Go or Rust or whatever.
+		DynamoDB - our approach works well with NoSQL, although if we try and do really fancy dashboards we may regret it.
+		React - perfectly fine frontend stack
+		OIDC - I'd have to spend way more time researching it to know the pros/cons vs genuine alternatives, but OAuth is generally speaking fine
+		
+	SIXTH PASS
+		Let's add good logging coverage to track when a user request lands, when it's finished processing, the time required to process, the time for database calls, any errors or exceptions, some very high-level logs in pricing engine like the number of unique items, number of unique promotions applied, etc. 
+		In short, we want to know what a user is doing, have an idea on what kind of calls are consuming what resources, have an idea on how our services are really performing, etc.
+	
+	MAINTAINABILITY
+		! create repo, make commit so we can see a diff of it.
+		PROMPT
+			Let's add a new promotion strategy called "bogo triple" which is like BOGO but you can add two items as long as their total value (after any discounts) is less than the total value of another item (after any discounts.) It's basically a bogo with more flexibility to let you buy two cheap add-ons to a larger item.
+	
+	SEVENTH PASS
+		Update the README:
+			Trim the Limits section - just show the list of limits and remove the first two paragraphs as well as the blurb about AWS deployment. 		
+			Add a section above "Run locally - no external accounts" titled "Overview" which gives a brief overview.
+			Move the "Development and tests" section to above "Run locally - no external accounts"
+			Move the "Rule semantics" section from the architecture.md file to the bottom of the README, above the Limits section
+		TWEAK make sure that promotion descriptions for customers list the eligible categories and items. Make it scrollable if necessary to avoid making the UI too large.
+		TWEAK gray out a promotion which cannot possibly apply to any item in the cart. If there is an appropriate item in the catalog, have a button that says "Too good to pass up!" which adds enough of the appropriate item to allow applying the promotion.
+		
+	DESIGN RETRO
+		System
+			react - spring boot - dynamoDB
+			CLOUD:
+				r53, lb, cloudwatch, security stuff (cognito, SG, etc.), fargate, ecs, etc.
+	
+		After all that is done, answer the following questions:
+		
+			Are we deleting dynamoDB data eventually?
+			Which component or piece of the tech stack will fail to scale first?
+			Can a malicious user overload the system?
+			Can a malicious user store an excessive amount of data?
+			How do we ensure that a user cannot use an expired or deactivated promotion?
+			What's the Big O of our main calculations?
+			What would you recommend adding, changing, or removing?
+	
+		What's missing?
+			CICD
+			Monitoring (only have logs)
+			Autoscaling (only truly relevant for spring boot)
+			AWS cost limitation / alarms
+			Unusual client behavior alarms/logging
+			User data deletion
+				automatic (expiration) and per request (PDD)
+			User data limits overall, not just per item
+			User calculation throttling
+			More clarity for admins when creating strategy and test cases
+		
+		Optimizations
+			Cache the promotionCatalog?
+			Split off the calculation to separate service/lambdas to handle individual scaling?
+			
+		PROMPT
+			copy most of that with decisions.md requirement, feed it to AI, and then review
+		
+		PROMPT
+			Let's make sure that the README shows exactly how to run the services locally - we want it to be very easy to run locally, ideally without Docker
+
